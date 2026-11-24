@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalkulator Konveksi</title>
+<meta name="theme-color" content="#0f6b63">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kalkulator Konveksi">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: harga jual di atas, isian di kiri, hasil di kanan (satu kolom di HP). */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #17202e;
+  --muted: #5b6676;
+  --line: #dde2ea;
+  --accent: #0f6b63;
+  --accent-soft: #dff1ee;
+  --input-bg: #fff9d6;
+  --input-ink: #1d4ed8;
+  --warn: #9a4b05;
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b;
+    --surface: #171e28;
+    --ink: #e8edf4;
+    --muted: #98a3b3;
+    --line: #2a3442;
+    --accent: #4fd1c0;
+    --accent-soft: #12332f;
+    --input-bg: #2b2a16;
+    --input-ink: #8ab4ff;
+    --warn: #f2b25c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b;
+  --surface: #171e28;
+  --ink: #e8edf4;
+  --muted: #98a3b3;
+  --line: #2a3442;
+  --accent: #4fd1c0;
+  --accent-soft: #12332f;
+  --input-bg: #2b2a16;
+  --input-ink: #8ab4ff;
+  --warn: #f2b25c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 48px; }
+header h1 {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 32px);
+  line-height: 1.15;
+  margin: 0 0 4px;
+  text-wrap: balance;
+}
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.tile.fob { border-top: 4px solid var(--accent); }
+.tile.cmt { border-top: 4px solid var(--warn); }
+.tile .k { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.tile .v { font-family: var(--font-display); font-size: clamp(24px, 6vw, 36px); font-weight: 700; line-height: 1.1; margin: 4px 0; overflow-wrap: anywhere; }
+.tile .s { font-size: 13px; color: var(--muted); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .results { position: sticky; top: 12px; }
+}
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+.card h2 { font-family: var(--font-display); font-size: 17px; margin: 0 0 2px; }
+.card .sub { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 4px 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.field:first-of-type { border-top: 0; }
+.field label { font-size: 14px; }
+.field .hint { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: -2px; }
+input.num, input.txt {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--input-ink);
+  font: inherit;
+  font-weight: 500;
+  text-align: right;
+}
+input.txt { text-align: left; }
+select { width: 100%; min-height: 38px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.total { display: flex; justify-content: space-between; padding: 10px 0 0; border-top: 2px solid var(--line); font-weight: 700; margin-top: 4px; }
+details summary { cursor: pointer; font-weight: 700; color: var(--accent); padding: 4px 0; }
+details[open] summary { margin-bottom: 6px; }
+
+button {
+  font: inherit; font-weight: 700; min-height: 38px; padding: 6px 14px; border-radius: 8px;
+  border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer;
+}
+button:hover { background: var(--accent-soft); }
+
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 8px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; white-space: normal; }
+thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 2px solid var(--line); }
+tr.strong td { font-weight: 700; }
+tr.hl td { background: var(--accent-soft); font-weight: 700; }
+tr.sep td { border-top: 2px solid var(--line); }
+.note { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+@media (max-width: 440px) {
+  .field { grid-template-columns: minmax(0, 1fr) 120px; }
+  .tile { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Kalkulator Harga Konveksi</h1>
+    <p>Isi harga bahan dan upah di kotak kuning. Harga jual ke brand, margin, dan modal total muncul otomatis.</p>
+  </header>
+
+  <section class="tiles" aria-live="polite">
+    <div class="tile fob">
+      <div class="k">Harga jual FOB</div>
+      <div class="v" id="t-fob">-</div>
+      <div class="s" id="t-fob-s"></div>
+    </div>
+    <div class="tile cmt">
+      <div class="k">Harga jual CMT</div>
+      <div class="v" id="t-cmt">-</div>
+      <div class="s" id="t-cmt-s"></div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <div class="stack">
+      <div class="card" id="c-order"><h2>Order</h2></div>
+      <div class="card" id="c-kain"><h2>Kain</h2><p class="sub">Dipakai untuk skema FOB. CMT: kain dari brand.</p></div>
+      <div class="card" id="c-upah"><h2>Upah dan bahan pendukung</h2><p class="sub">Rupiah per pcs.</p></div>
+      <div class="card" id="c-laba"><h2>Overhead dan target laba</h2></div>
+      <div class="card" id="c-lain"></div>
+    </div>
+
+    <div class="stack results">
+      <div class="card">
+        <h2>Hasil</h2>
+        <p class="sub" id="r-sub"></p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Per pcs</th><th>FOB</th><th>CMT</th></tr></thead>
+            <tbody id="r-body"></tbody>
+          </table>
+        </div>
+        <div class="tablewrap" style="margin-top:14px">
+          <table>
+            <thead><tr><th>Total satu order</th><th>FOB</th><th>CMT</th></tr></thead>
+            <tbody id="r-total"></tbody>
+          </table>
+        </div>
+        <p class="note">Modal total = biaya per pcs (termasuk overhead) dikali jumlah order. Margin total = laba total dibagi omzet total.</p>
+        <div style="margin-top:12px"><button type="button" id="b-reset">Kembalikan ke contoh</button></div>
+        <p class="note" id="copy-note">Isian tersimpan di browser ini saja.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var STORE = 'kalkulator-konveksi-v2';
+
+  var DEF = {
+    nama: 'Kaos polos 24s combed',
+    qty: 15000,
+    kain: 113400, hasil: 3, rol: 25, ribRol: 1, ribSel: 10000, susut: 0,
+    cutting: 500, jahit: 2000, finishing: 500, benang: 500, plastik: 200, lain: 200,
+    overhead: 700, reject: 0, mode: 'rp', target: 5000, targetPct: 10, bulat: 500
+  };
+
+  var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
+
+  var SECTIONS = {
+    'c-order': [
+      ['nama', 'Nama brand / produk', 'text'],
+      ['qty', 'Jumlah order (pcs)']
+    ],
+    'c-kain': [
+      ['kain', 'Harga kain per kg (Rp)'],
+      ['hasil', 'Hasil kain (pcs per kg)', null, 'Rata-rata semua ukuran. Untuk ukuran L sekitar 3,0.']
+    ],
+    'c-upah': [
+      ['cutting', 'Cutting'],
+      ['jahit', 'Jahit'],
+      ['finishing', 'Finishing'],
+      ['benang', 'Benang'],
+      ['plastik', 'Plastik OPP'],
+      ['lain', 'Jarum, oli, listrik, lain-lain']
+    ],
+    'c-laba': [
+      ['overhead', 'Overhead (Rp per pcs)'],
+      ['mode', 'Target laba dihitung dari', 'select'],
+      ['target', 'Target laba bersih (Rp per pcs)'],
+      ['targetPct', 'Target laba bersih (%)', null, 'Untuk CMT, persen dihitung dari biaya tanpa kain, jadi labanya kecil. Untuk CMT lebih aman pakai Rupiah per pcs.']
+    ],
+    'c-lain': [
+      ['rol', 'Berat satu rol kain (kg)'],
+      ['ribRol', 'Kebutuhan rib per rol (kg)'],
+      ['ribSel', 'Selisih harga rib per kg (Rp)'],
+      ['susut', 'Cadangan susut kain (%)', null, 'Tambah 1-3% kalau ada sisa potongan'],
+      ['reject', 'Cadangan reject (%)', null, 'Persen dari biaya produksi untuk barang cacat'],
+      ['bulat', 'Pembulatan harga jual (Rp)', null, 'Harga jual dibulatkan ke atas']
+    ]
+  };
+
+  var state = load();
+
+  function load() {
+    var s = {}, k;
+    for (k in DEF) s[k] = DEF[k];
+    try {
+      var raw = localStorage.getItem(STORE);
+      if (raw) {
+        var o = JSON.parse(raw);
+        for (k in DEF) if (o && o[k] !== undefined && typeof o[k] === typeof DEF[k]) s[k] = o[k];
+      }
+    } catch (e) {}
+    return s;
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  // Terima koma atau titik sebagai desimal. "3,5" dan "3.5" sama-sama 3,5. "113.400" dibaca 113400.
+  function parseNum(str) {
+    var s = String(str).trim().replace(/\s/g, '');
+    if (!s) return 0;
+    if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    var v = parseFloat(s);
+    return isFinite(v) && v >= 0 ? v : 0;
+  }
+  function fmtIn(v) { return String(v).replace('.', ','); }
+
+  function selectHTML(key) {
+    var h = '<select id="f-' + key + '" data-k="' + key + '">';
+    MODES.forEach(function (m) { h += '<option value="' + m[0] + '"' + (state[key] === m[0] ? ' selected' : '') + '>' + m[1] + '</option>'; });
+    return h + '</select>';
+  }
+
+  function fieldHTML(f) {
+    var key = f[0], label = f[1], kind = f[2], hint = f[3];
+    var h = '<div class="field"><label for="f-' + key + '">' + esc(label) + '</label>';
+    if (kind === 'select') h += selectHTML(key);
+    else if (kind === 'text') h += '<input type="text" class="txt" id="f-' + key + '" data-k="' + key + '" value="' + esc(state[key]) + '">';
+    else h += '<input type="text" class="num" inputmode="decimal" autocomplete="off" id="f-' + key + '" data-k="' + key + '" value="' + fmtIn(state[key]) + '">';
+    if (hint) h += '<div class="hint">' + esc(hint) + '</div>';
+    return h + '</div>';
+  }
+
+  function build() {
+    Object.keys(SECTIONS).forEach(function (id) {
+      var card = document.getElementById(id);
+      var html = SECTIONS[id].map(fieldHTML).join('');
+      if (id === 'c-upah') html += '<div class="total"><span>Total upah dan pendukung</span><span id="x-upah"></span></div>';
+      if (id === 'c-lain') html = '<details><summary>Pengaturan tambahan (rib, susut, reject, pembulatan)</summary>' + html + '</details>';
+      card.insertAdjacentHTML('beforeend', html);
+    });
+  }
+
+  function roundUp(x, step) {
+    if (!(step > 0)) return x;
+    return Math.ceil(x / step - 1e-9) * step;
+  }
+
+  // Laba rupiah per pcs dari target. markup = persen dari biaya, margin = persen dari harga jual.
+  function labaFor(hpp, t, mode) {
+    if (mode === 'markup') return hpp * t / 100;
+    if (mode === 'margin') return t >= 0 && t < 100 ? hpp / (1 - t / 100) - hpp : NaN;
+    return t;
+  }
+
+  function calc(s) {
+    var y = s.hasil > 0 ? s.hasil : NaN;
+    var sus = 1 + s.susut / 100;
+    var upah = s.cutting + s.jahit + s.finishing + s.benang + s.plastik + s.lain;
+    var fob = { kain: s.kain / y * sus, rib: (s.kain + s.ribSel) * s.ribRol / (s.rol * y) * sus };
+    var cmt = { kain: 0, rib: 0 };
+    [fob, cmt].forEach(function (c) {
+      c.upah = upah;
+      c.reject = (c.kain + c.rib + c.upah) * s.reject / 100;
+      c.over = s.overhead;
+      c.hpp = c.kain + c.rib + c.upah + c.reject + c.over;
+      c.target = labaFor(c.hpp, s.mode === 'rp' ? s.target : s.targetPct, s.mode);
+      c.harga = roundUp(c.hpp + c.target, s.bulat);
+      c.laba = c.harga - c.hpp;
+      c.margin = c.laba / c.harga;
+      c.modal = c.hpp * s.qty;
+      c.omzet = c.harga * s.qty;
+      c.labaTotal = c.laba * s.qty;
+    });
+    return { fob: fob, cmt: cmt, upah: upah };
+  }
+
+  function n(x) { return isFinite(x) ? Math.round(x).toLocaleString('id-ID') : '-'; }
+  function rp(x) { return isFinite(x) ? 'Rp ' + (x < 0 ? '-' : '') + Math.abs(Math.round(x)).toLocaleString('id-ID') : '-'; }
+  function pct(x) { return isFinite(x) ? (x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '%' : '-'; }
+
+  function row(label, a, b, cls) {
+    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + label + '</td><td>' + a + '</td><td>' + b + '</td></tr>';
+  }
+
+  function render() {
+    var r = calc(state), f = r.fob, c = r.cmt;
+    document.getElementById('x-upah').textContent = rp(r.upah);
+    document.getElementById('f-target').parentNode.hidden = state.mode !== 'rp';
+    document.getElementById('f-targetPct').parentNode.hidden = state.mode === 'rp';
+
+    document.getElementById('t-fob').textContent = rp(f.harga);
+    document.getElementById('t-cmt').textContent = rp(c.harga);
+    document.getElementById('t-fob-s').textContent = 'Laba ' + rp(f.laba) + ' per pcs, margin ' + pct(f.margin);
+    document.getElementById('t-cmt-s').textContent = 'Laba ' + rp(c.laba) + ' per pcs, margin ' + pct(c.margin);
+
+    document.getElementById('r-sub').textContent = (state.nama ? state.nama + ', ' : '') + n(state.qty) + ' pcs';
+
+    var tl = state.mode === 'rp' ? '' : ' (' + fmtIn(state.targetPct) + '% ' + (state.mode === 'markup' ? 'dari biaya' : 'dari harga jual') + ')';
+    document.getElementById('r-body').innerHTML =
+      row('Kain', n(f.kain), n(c.kain)) +
+      row('Rib', n(f.rib), n(c.rib)) +
+      row('Upah dan bahan pendukung', n(f.upah), n(c.upah)) +
+      row('Cadangan reject', n(f.reject), n(c.reject)) +
+      row('Overhead', n(f.over), n(c.over)) +
+      row('Total biaya per pcs', n(f.hpp), n(c.hpp), 'strong sep') +
+      row('Target laba' + tl, n(f.target), n(c.target)) +
+      row('Harga jual', n(f.harga), n(c.harga), 'hl') +
+      row('Laba per pcs', n(f.laba), n(c.laba)) +
+      row('Margin', pct(f.margin), pct(c.margin));
+
+    document.getElementById('r-total').innerHTML =
+      row('Modal total', rp(f.modal), rp(c.modal), 'strong') +
+      row('Omzet total', rp(f.omzet), rp(c.omzet)) +
+      row('Laba total', rp(f.labaTotal), rp(c.labaTotal), 'hl') +
+      row('Margin total', pct(f.margin), pct(c.margin));
+  }
+
+  function onInput(e) {
+    var el = e.target, k = el.getAttribute && el.getAttribute('data-k');
+    if (!k) return;
+    if (el.tagName === 'SELECT') state[k] = el.value;
+    else if (el.classList.contains('txt')) state[k] = el.value;
+    else state[k] = parseNum(el.value);
+    save();
+    render();
+  }
+
+  function syncInputs() {
+    Object.keys(DEF).forEach(function (k) {
+      var el = document.getElementById('f-' + k);
+      if (el) el.value = (el.tagName === 'SELECT' || el.classList.contains('txt')) ? state[k] : fmtIn(state[k]);
+    });
+  }
+
+  build();
+  document.addEventListener('input', onInput);
+  document.addEventListener('change', onInput);
+
+  // Saat kotak disentuh, isi lama langsung terpilih supaya ketikan baru menggantikannya.
+  document.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (el && el.tagName === 'INPUT' && (el.classList.contains('num') || el.classList.contains('txt'))) {
+      setTimeout(function () {
+        try { el.select(); el.setSelectionRange(0, el.value.length); } catch (err) {}
+      }, 0);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'b-reset') {
+      var k;
+      for (k in DEF) state[k] = DEF[k];
+      syncInputs(); save(); render();
+      document.getElementById('copy-note').textContent = 'Isian dikembalikan ke contoh kaos polos 24s.';
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
