@@ -158,6 +158,42 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
 
 /* Lembar cetak */
 #sheet { display: none; }
+
+#pv { position: fixed; inset: 0; z-index: 50; background: #4a4f57; display: flex; flex-direction: column; }
+#pv[hidden] { display: none; }
+#pv .bar { display: flex; gap: 8px; align-items: center; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); background: #fff; }
+#pv .bar b { flex: 1; font-size: 15px; }
+#pv .scroll { flex: 1; overflow: auto; padding: 12px 8px 40px; -webkit-overflow-scrolling: touch; }
+#pv .holder { margin: 0 auto; }
+.paper { width: 794px; min-height: 1123px; box-sizing: border-box; padding: 56px 60px; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; transform-origin: top left; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+.paper h1 { font-size: 22px; margin: 0 0 10px; }
+.paper table { width: 100%; border-collapse: collapse; }
+.paper .att { margin-top: 40px; padding-top: 30px; border-top: 2px dashed #bbb; }
+  .paper h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; margin: 0 0 10px; }
+  .paper .m { font-size: 12px; margin: 2px 0; }
+  .paper .m b { display: inline-block; width: 90px; font-weight: 400; color: #555; }
+  .paper h2 { font-family: Arial, Helvetica, sans-serif; font-size: 14px; margin: 18px 0 4px; padding-bottom: 3px; border-bottom: 2px solid #0f6b63; }
+  .paper table { font-size: 13px; }
+  .paper td { border-bottom: 1px solid #ddd; padding: 5px 0; color: #000; }
+  .paper td.big { font-size: 20px; }
+  .paper .n { font-size: 12px; color: #444; margin-top: 14px; }
+  .paper .f { font-size: 10px; color: #888; margin-top: 30px; }
+  .paper .kop { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0357a6; padding-bottom: 8px; margin-bottom: 14px; }
+  .paper .kop img { width: 200px; height: auto; }
+  .paper .kop .a { font-size: 11px; line-height: 1.45; }
+  .paper table.q { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 8px; }
+  .paper table.q th { background: #0357a6; color: #fff; text-align: left; padding: 6px; }
+  .paper table.q td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
+  .paper .nt { font-size: 12px; margin: 10px 0 0; }
+  .paper .nt b { display: block; }
+  .paper .ttd { display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; }
+  .paper .ttd div { width: 45%; }
+  .paper .ttd .sp { height: 60px; }
+  .paper .att { page-break-before: always; break-before: page; }
+  .paper .att h3 { font-size: 13px; margin: 0 0 8px; }
+  .paper .att img { max-width: 100%; max-height: 240mm; }
+  .paper table.sum { margin-left: auto; width: 55%; font-size: 12px; margin-top: 6px; }
+  .paper table.sum td { border: 0; padding: 3px 6px; }
 @media print {
   html, body { background: #fff !important; color: #000 !important; }
   .app { display: none !important; }
@@ -263,6 +299,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
 
 </div>
 <div id="sheet" aria-hidden="true"></div>
+<div id="pv" hidden><div class="bar"><b>Preview</b><button type="button" id="b-pv-share" class="primary">Bagikan PDF</button><button type="button" id="b-pv-close">Tutup</button></div><div class="scroll"><div class="holder" id="pv-holder"></div></div></div>
 
 <script>
 (function () {
@@ -568,7 +605,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
         ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
       '<div class="hint" id="po-info"></div></div>' +
-      '<div class="actions"><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-print">Cetak</button></div>' +
+      '<div class="actions"><button type="button" id="b-preview">Lihat preview</button><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-print">Cetak</button></div>' +
       '<p class="note" id="pdf-note"></p>' +
       '<div class="actions"><button type="button" id="b-reset">Kembalikan ke contoh</button></div>';
   }
@@ -1183,13 +1220,10 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     fallback();
   }
 
-  function printSheet() {
+  function sheetHTML() {
     var d = docData();
     var h, m = state.pdfMode;
-    function go(html) {
-      document.getElementById('sheet').innerHTML = html;
-      try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
-    }
+    function go(html) { return html; }
     if (m === 'po') {
       var pq = poData();
       if (!pq) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
@@ -1208,8 +1242,40 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     });
     if (d.note) h += '<div class="n">' + esc(d.note) + '</div>';
     h += '<div class="f">Dibuat dengan Kalkulator Harga Konveksi</div>';
-    go(h);
+    return go(h);
   }
+
+  function printSheet() {
+    var html = sheetHTML();
+    if (!html) return;
+    document.getElementById('sheet').innerHTML = html;
+    try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
+  }
+
+  function fitPreview() {
+    var hol = document.getElementById('pv-holder'), pp = hol && hol.firstChild;
+    if (!pp) return;
+    var sc = Math.min(1, (document.getElementById('pv').clientWidth - 16) / 794);
+    pp.style.transform = 'scale(' + sc + ')';
+    hol.style.width = (794 * sc) + 'px';
+    hol.style.height = (pp.offsetHeight * sc) + 'px';
+  }
+  function openPreview() {
+    var html = sheetHTML();
+    if (!html) return;
+    var hol = document.getElementById('pv-holder');
+    hol.innerHTML = '<div class="paper">' + html + '</div>';
+    document.getElementById('pv').hidden = false;
+    document.body.style.overflow = 'hidden';
+    fitPreview();
+    var imgs = hol.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++) imgs[i].onload = fitPreview;
+  }
+  function closePreview() {
+    document.getElementById('pv').hidden = true;
+    document.body.style.overflow = '';
+  }
+  window.addEventListener('resize', fitPreview);
 
   /* ---------- Layar ---------- */
   function enter(sch) {
@@ -1326,7 +1392,9 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     }
     else if (id === 'b-ttd') document.getElementById('f-ttdfile').click();
     else if (id === 'b-ttd-del') { state.ttdImg = ''; save(); showTtd(); }
-    else if (id === 'b-share') sharePdf();
+    else if (id === 'b-share' || id === 'b-pv-share') sharePdf();
+    else if (id === 'b-preview') openPreview();
+    else if (id === 'b-pv-close') closePreview();
     else if (id === 'b-print') printSheet();
     else if (id === 'b-reset') {
       var keepTtd = state.ttdImg, keepV = state.vendors;
