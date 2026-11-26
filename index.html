@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,12 +12,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-/* Layout idea: harga jual di atas, isian di kiri, hasil di kanan (satu kolom di HP). */
+/* Layout idea: pilih skema dulu, lalu isian di kiri dan hasil di kanan (satu kolom di HP). */
 :root {
   --bg: #f3f5f8;
   --surface: #ffffff;
@@ -26,9 +26,11 @@
   --line: #dde2ea;
   --accent: #0f6b63;
   --accent-soft: #dff1ee;
+  --accent-ink: #ffffff;
   --input-bg: #fff9d6;
   --input-ink: #1d4ed8;
   --warn: #9a4b05;
+  --bad: #b42318;
   --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
   --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -42,9 +44,11 @@
     --line: #2a3442;
     --accent: #4fd1c0;
     --accent-soft: #12332f;
+    --accent-ink: #0b1f1c;
     --input-bg: #2b2a16;
     --input-ink: #8ab4ff;
     --warn: #f2b25c;
+    --bad: #ff8a7d;
     color-scheme: dark;
   }
 }
@@ -56,9 +60,11 @@
   --line: #2a3442;
   --accent: #4fd1c0;
   --accent-soft: #12332f;
+  --accent-ink: #0b1f1c;
   --input-bg: #2b2a16;
   --input-ink: #8ab4ff;
   --warn: #f2b25c;
+  --bad: #ff8a7d;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -73,21 +79,30 @@ body {
 }
 [hidden] { display: none !important; }
 .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 48px; }
-header h1 {
-  font-family: var(--font-display);
-  font-size: clamp(24px, 4vw, 32px);
-  line-height: 1.15;
-  margin: 0 0 4px;
-  text-wrap: balance;
-}
-header p { margin: 0; color: var(--muted); max-width: 62ch; }
+h1 { font-family: var(--font-display); font-size: clamp(24px, 4vw, 32px); line-height: 1.15; margin: 0 0 4px; text-wrap: balance; }
+.lead { margin: 0; color: var(--muted); max-width: 62ch; }
 
-.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
-.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
-.tile.fob { border-top: 4px solid var(--accent); }
-.tile.cmt { border-top: 4px solid var(--warn); }
+/* Layar pilih skema */
+.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+@media (max-width: 560px) { .choices { grid-template-columns: minmax(0, 1fr); } }
+.choice {
+  text-align: left; display: block; width: 100%; padding: 20px; min-height: 0;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; cursor: pointer;
+  border-top: 5px solid var(--accent);
+}
+.choice.cmt { border-top-color: var(--warn); }
+.choice:hover { background: var(--accent-soft); }
+.choice .big { font-family: var(--font-display); font-size: 34px; font-weight: 700; line-height: 1; }
+.choice .what { font-weight: 700; margin: 6px 0 8px; }
+.choice .desc { color: var(--muted); font-size: 14px; font-weight: 400; }
+
+.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.badge { font-weight: 700; font-size: 12px; letter-spacing: .05em; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 16px 0; border-top: 4px solid var(--accent); }
+.tile.cmt { border-top-color: var(--warn); }
 .tile .k { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.tile .v { font-family: var(--font-display); font-size: clamp(24px, 6vw, 36px); font-weight: 700; line-height: 1.1; margin: 4px 0; overflow-wrap: anywhere; }
+.tile .v { font-family: var(--font-display); font-size: clamp(28px, 7vw, 42px); font-weight: 700; line-height: 1.1; margin: 4px 0; overflow-wrap: anywhere; }
 .tile .s { font-size: 13px; color: var(--muted); }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -104,29 +119,27 @@ header p { margin: 0; color: var(--muted); max-width: 62ch; }
 .field label { font-size: 14px; }
 .field .hint { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: -2px; }
 input.num, input.txt {
-  width: 100%;
-  min-height: 38px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--input-bg);
-  color: var(--input-ink);
-  font: inherit;
-  font-weight: 500;
-  text-align: right;
+  width: 100%; min-height: 38px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--input-bg); color: var(--input-ink); font: inherit; font-weight: 500; text-align: right;
 }
 input.txt { text-align: left; }
 select { width: 100%; min-height: 38px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
-.total { display: flex; justify-content: space-between; padding: 10px 0 0; border-top: 2px solid var(--line); font-weight: 700; margin-top: 4px; }
+.total { display: flex; justify-content: space-between; padding: 10px 0 0; border-top: 2px solid var(--line); font-weight: 700; margin-top: 6px; }
 details summary { cursor: pointer; font-weight: 700; color: var(--accent); padding: 4px 0; }
 details[open] summary { margin-bottom: 6px; }
 
+.crow { display: grid; grid-template-columns: minmax(0, 1fr) 110px 38px; gap: 8px; padding: 5px 0; align-items: center; }
+.crow .x { padding: 0; min-width: 38px; color: var(--bad); border-color: var(--line); }
+
 button {
-  font: inherit; font-weight: 700; min-height: 38px; padding: 6px 14px; border-radius: 8px;
+  font: inherit; font-weight: 700; min-height: 40px; padding: 6px 14px; border-radius: 8px;
   border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer;
 }
 button:hover { background: var(--accent-soft); }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
 .tablewrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -137,124 +150,167 @@ tr.strong td { font-weight: 700; }
 tr.hl td { background: var(--accent-soft); font-weight: 700; }
 tr.sep td { border-top: 2px solid var(--line); }
 .note { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+#pdf-note { min-height: 1.4em; }
+textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--input-bg); color: var(--input-ink); font: inherit; font-weight: 500; text-align: left; resize: vertical; }
+.field.full { grid-template-columns: minmax(0, 1fr); }
+.logobox { display: inline-block; background: #fff; border-radius: 10px; padding: 8px 12px; margin-bottom: 16px; }
+.logobox img { display: block; height: 54px; width: auto; }
+
+/* Lembar cetak */
+#sheet { display: none; }
+@media print {
+  html, body { background: #fff !important; color: #000 !important; }
+  .app { display: none !important; }
+  #sheet { display: block; font-family: Arial, Helvetica, sans-serif; color: #000; padding: 0; }
+  #sheet h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; margin: 0 0 10px; }
+  #sheet .m { font-size: 12px; margin: 2px 0; }
+  #sheet .m b { display: inline-block; width: 90px; font-weight: 400; color: #555; }
+  #sheet h2 { font-family: Arial, Helvetica, sans-serif; font-size: 14px; margin: 18px 0 4px; padding-bottom: 3px; border-bottom: 2px solid #0f6b63; }
+  #sheet table { font-size: 13px; }
+  #sheet td { border-bottom: 1px solid #ddd; padding: 5px 0; color: #000; }
+  #sheet td.big { font-size: 20px; }
+  #sheet .n { font-size: 12px; color: #444; margin-top: 14px; }
+  #sheet .f { font-size: 10px; color: #888; margin-top: 30px; }
+  #sheet .kop { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0357a6; padding-bottom: 8px; margin-bottom: 14px; }
+  #sheet .kop img { width: 200px; height: auto; }
+  #sheet .kop .a { font-size: 11px; line-height: 1.45; }
+  #sheet table.q { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 8px; }
+  #sheet table.q th { background: #0357a6; color: #fff; text-align: left; padding: 6px; }
+  #sheet table.q td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
+  #sheet .nt { font-size: 12px; margin: 10px 0 0; }
+  #sheet .nt b { display: block; }
+  #sheet .ttd { display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; }
+  #sheet .ttd div { width: 45%; }
+  #sheet .ttd .sp { height: 60px; }
+}
 @media (max-width: 440px) {
   .field { grid-template-columns: minmax(0, 1fr) 120px; }
-  .tile { padding: 12px; }
+  .crow { grid-template-columns: minmax(0, 1fr) 96px 38px; }
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+<div class="app wrap">
+
+  <div id="v-home">
+    <div class="logobox"><img id="logo" alt="Pandera Garmenindo"></div>
     <h1>Kalkulator Harga Konveksi</h1>
-    <p>Isi harga bahan dan upah di kotak kuning. Harga jual ke brand, margin, dan modal total muncul otomatis.</p>
-  </header>
-
-  <section class="tiles" aria-live="polite">
-    <div class="tile fob">
-      <div class="k">Harga jual FOB</div>
-      <div class="v" id="t-fob">-</div>
-      <div class="s" id="t-fob-s"></div>
+    <p class="lead">Pilih skema yang ditawarkan brand. Kamu akan mengisi biaya, lalu dapat harga jual, margin, dan modal total.</p>
+    <div class="choices">
+      <button type="button" class="choice" data-scheme="FOB">
+        <div class="big">FOB</div>
+        <div class="what">Konveksi beli kain sendiri</div>
+        <div class="desc">Isi bahan, rib, biaya pengerjaan, dan biaya custom.</div>
+      </button>
+      <button type="button" class="choice cmt" data-scheme="CMT">
+        <div class="big">CMT</div>
+        <div class="what">Kain dari brand</div>
+        <div class="desc">Hanya biaya pengerjaan: cutting, making, trimming, dan biaya custom.</div>
+      </button>
     </div>
-    <div class="tile cmt">
-      <div class="k">Harga jual CMT</div>
-      <div class="v" id="t-cmt">-</div>
-      <div class="s" id="t-cmt-s"></div>
-    </div>
-  </section>
+    <p class="note">Isian tersimpan di browser ini saja.</p>
+  </div>
 
-  <div class="layout">
-    <div class="stack">
-      <div class="card" id="c-order"><h2>Order</h2></div>
-      <div class="card" id="c-kain"><h2>Kain</h2><p class="sub">Dipakai untuk skema FOB. CMT: kain dari brand.</p></div>
-      <div class="card" id="c-upah"><h2>Upah dan bahan pendukung</h2><p class="sub">Rupiah per pcs.</p></div>
-      <div class="card" id="c-laba"><h2>Overhead dan target laba</h2></div>
-      <div class="card" id="c-lain"></div>
+  <div id="v-calc" hidden>
+    <div class="topbar">
+      <button type="button" id="b-back">&larr; Ganti skema</button>
+      <span class="badge" id="badge"></span>
     </div>
+    <h1 id="calc-title"></h1>
+    <p class="lead" id="calc-lead"></p>
 
-    <div class="stack results">
-      <div class="card">
-        <h2>Hasil</h2>
-        <p class="sub" id="r-sub"></p>
-        <div class="tablewrap">
-          <table>
-            <thead><tr><th>Per pcs</th><th>FOB</th><th>CMT</th></tr></thead>
-            <tbody id="r-body"></tbody>
-          </table>
+    <section class="tile" id="tile" aria-live="polite">
+      <div class="k" id="t-k">Harga jual</div>
+      <div class="v" id="t-v">-</div>
+      <div class="s" id="t-s"></div>
+    </section>
+
+    <div class="layout">
+      <div class="stack" id="col-inputs"></div>
+      <div class="stack results">
+        <div class="card">
+          <h2>Hasil</h2>
+          <p class="sub" id="r-sub"></p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Per pcs</th><th>Rp</th></tr></thead>
+              <tbody id="r-body"></tbody>
+            </table>
+          </div>
+          <div class="tablewrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Total satu order</th><th>Rp</th></tr></thead>
+              <tbody id="r-total"></tbody>
+            </table>
+          </div>
+          <p class="note">Modal total = biaya per pcs dikali jumlah order. Margin total = laba total dibagi omzet total.</p>
         </div>
-        <div class="tablewrap" style="margin-top:14px">
-          <table>
-            <thead><tr><th>Total satu order</th><th>FOB</th><th>CMT</th></tr></thead>
-            <tbody id="r-total"></tbody>
-          </table>
-        </div>
-        <p class="note">Modal total = biaya per pcs (termasuk overhead) dikali jumlah order. Margin total = laba total dibagi omzet total.</p>
-        <div style="margin-top:12px"><button type="button" id="b-reset">Kembalikan ke contoh</button></div>
-        <p class="note" id="copy-note">Isian tersimpan di browser ini saja.</p>
+        <div class="card" id="col-pdf"></div>
       </div>
     </div>
   </div>
+
 </div>
+<div id="sheet" aria-hidden="true"></div>
 
 <script>
 (function () {
-  var STORE = 'kalkulator-konveksi-v2';
+  var STORE = 'kalkulator-konveksi-v3';
+  var LOGO = 'data:image/png;base64,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';
+  var LOGO_RATIO = 0.43286;
 
   var DEF = {
-    nama: 'Kaos polos 24s combed',
+    nama: 'Plain T-shirt, combed 24s', brand: '',
+    usaha: 'Pandera Garmenindo', alamat: 'Jl. Katapang Andir, Kec. Baleendah, Andir, Kec. Dayeuhkolot, Kabupaten Bandung, Jawa Barat 40258', telp: '0811-2272-705', nomor: '', up: '', spek: 'Combed 24s, sizes S-XXL', berlaku: 14,
+    termasuk: '', belum: 'Labels and hangtags (supplied by buyer), shipping cost.',
+    bayar: 'Payment per delivery, bank transfer no later than Saturday.',
+    kirim: 'Delivery every Friday. Production lead time to be agreed after the PO is received and materials are ready.',
+    ketentuan: 'Quantity tolerance +/- 3%. If an order is cancelled after the fabric has been purchased, the fabric cost is borne by the buyer. Changes in color, size, or quantity must be agreed in writing before production.',
+    ttd: '',
     qty: 15000,
-    kain: 113400, hasil: 3, rol: 25, ribRol: 1, ribSel: 10000, susut: 0,
-    cutting: 500, jahit: 2000, finishing: 500, benang: 500, plastik: 200, lain: 200,
-    overhead: 700, reject: 0, mode: 'rp', target: 5000, targetPct: 10, bulat: 500
-  };
-
-  var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
-
-  var SECTIONS = {
-    'c-order': [
-      ['nama', 'Nama brand / produk', 'text'],
-      ['qty', 'Jumlah order (pcs)']
-    ],
-    'c-kain': [
-      ['kain', 'Harga kain per kg (Rp)'],
-      ['hasil', 'Hasil kain (pcs per kg)', null, 'Rata-rata semua ukuran. Untuk ukuran L sekitar 3,0.']
-    ],
-    'c-upah': [
-      ['cutting', 'Cutting'],
-      ['jahit', 'Jahit'],
-      ['finishing', 'Finishing'],
-      ['benang', 'Benang'],
-      ['plastik', 'Plastik OPP'],
-      ['lain', 'Jarum, oli, listrik, lain-lain']
-    ],
-    'c-laba': [
-      ['overhead', 'Overhead (Rp per pcs)'],
-      ['mode', 'Target laba dihitung dari', 'select'],
-      ['target', 'Target laba bersih (Rp per pcs)'],
-      ['targetPct', 'Target laba bersih (%)', null, 'Untuk CMT, persen dihitung dari biaya tanpa kain, jadi labanya kecil. Untuk CMT lebih aman pakai Rupiah per pcs.']
-    ],
-    'c-lain': [
-      ['rol', 'Berat satu rol kain (kg)'],
-      ['ribRol', 'Kebutuhan rib per rol (kg)'],
-      ['ribSel', 'Selisih harga rib per kg (Rp)'],
-      ['susut', 'Cadangan susut kain (%)', null, 'Tambah 1-3% kalau ada sisa potongan'],
-      ['reject', 'Cadangan reject (%)', null, 'Persen dari biaya produksi untuk barang cacat'],
-      ['bulat', 'Pembulatan harga jual (Rp)', null, 'Harga jual dibulatkan ke atas']
+    kain: 113400, hasil: 3, rol: 25, ribRol: 1, ribSel: 10000,
+    cutting: 500, making: 2000, trimming: 1000,
+    susut: 0, reject: 0, bulat: 500, hargaFix: 0,
+    mode: 'rp', target: 5000, targetPct: 10,
+    pdfMode: 'brand',
+    custom: [
+      { n: 'Plastik OPP', v: 200 },
+      { n: 'Jarum, oli, listrik, lain-lain', v: 200 },
+      { n: 'Overhead', v: 700 }
     ]
   };
 
-  var state = load();
+  var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
+  var PDFMODES = [['brand', 'Surat penawaran untuk brand (tanpa biaya dan laba)'], ['internal', 'Rincian internal (dengan biaya dan laba)']];
 
-  function load() {
+  var scheme = null;
+  var state = load();
+  document.getElementById('logo').src = LOGO;
+
+  function copyDef() {
     var s = {}, k;
     for (k in DEF) s[k] = DEF[k];
+    s.custom = DEF.custom.map(function (c) { return { n: c.n, v: c.v }; });
+    return s;
+  }
+  function load() {
+    var s = copyDef(), k;
     try {
       var raw = localStorage.getItem(STORE);
       if (raw) {
         var o = JSON.parse(raw);
-        for (k in DEF) if (o && o[k] !== undefined && typeof o[k] === typeof DEF[k]) s[k] = o[k];
+        for (k in DEF) {
+          if (k === 'custom') {
+            if (Array.isArray(o.custom)) {
+              s.custom = o.custom.filter(function (c) { return c && typeof c.n === 'string' && typeof c.v === 'number'; })
+                .map(function (c) { return { n: c.n, v: c.v }; });
+            }
+          } else if (o && o[k] !== undefined && typeof o[k] === typeof DEF[k]) s[k] = o[k];
+        }
       }
     } catch (e) {}
+    var OLDD = {"nama": "Kaos polos 24s combed", "spek": "Combed 24s, ukuran S-XXL", "belum": "Label dan hangtag (dari brand), ongkos kirim.", "bayar": "Pembayaran tiap pengiriman, transfer paling lambat hari Sabtu.", "kirim": "Pengiriman tiap hari Jumat. Waktu produksi disepakati setelah PO diterima dan bahan siap.", "ketentuan": "Toleransi jumlah +/- 3%. Order yang dibatalkan setelah kain dibeli, biaya kain ditanggung brand. Perubahan warna, ukuran, atau jumlah disepakati tertulis sebelum produksi."};
+    for (k in OLDD) if (s[k] === OLDD[k]) s[k] = DEF[k];
     return s;
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
@@ -272,37 +328,15 @@ tr.sep td { border-top: 2px solid var(--line); }
   }
   function fmtIn(v) { return String(v).replace('.', ','); }
 
-  function selectHTML(key) {
-    var h = '<select id="f-' + key + '" data-k="' + key + '">';
-    MODES.forEach(function (m) { h += '<option value="' + m[0] + '"' + (state[key] === m[0] ? ' selected' : '') + '>' + m[1] + '</option>'; });
-    return h + '</select>';
-  }
+  function n(x) { return isFinite(x) ? Math.round(x).toLocaleString('id-ID') : '-'; }
+  function rp(x) { return isFinite(x) ? 'Rp ' + (x < 0 ? '-' : '') + Math.abs(Math.round(x)).toLocaleString('id-ID') : '-'; }
+  function pct(x) { return isFinite(x) ? (x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '%' : '-'; }
 
-  function fieldHTML(f) {
-    var key = f[0], label = f[1], kind = f[2], hint = f[3];
-    var h = '<div class="field"><label for="f-' + key + '">' + esc(label) + '</label>';
-    if (kind === 'select') h += selectHTML(key);
-    else if (kind === 'text') h += '<input type="text" class="txt" id="f-' + key + '" data-k="' + key + '" value="' + esc(state[key]) + '">';
-    else h += '<input type="text" class="num" inputmode="decimal" autocomplete="off" id="f-' + key + '" data-k="' + key + '" value="' + fmtIn(state[key]) + '">';
-    if (hint) h += '<div class="hint">' + esc(hint) + '</div>';
-    return h + '</div>';
-  }
-
-  function build() {
-    Object.keys(SECTIONS).forEach(function (id) {
-      var card = document.getElementById(id);
-      var html = SECTIONS[id].map(fieldHTML).join('');
-      if (id === 'c-upah') html += '<div class="total"><span>Total upah dan pendukung</span><span id="x-upah"></span></div>';
-      if (id === 'c-lain') html = '<details><summary>Pengaturan tambahan (rib, susut, reject, pembulatan)</summary>' + html + '</details>';
-      card.insertAdjacentHTML('beforeend', html);
-    });
-  }
-
+  /* ---------- Hitungan ---------- */
   function roundUp(x, step) {
     if (!(step > 0)) return x;
     return Math.ceil(x / step - 1e-9) * step;
   }
-
   // Laba rupiah per pcs dari target. markup = persen dari biaya, margin = persen dari harga jual.
   function labaFor(hpp, t, mode) {
     if (mode === 'markup') return hpp * t / 100;
@@ -310,87 +344,428 @@ tr.sep td { border-top: 2px solid var(--line); }
     return t;
   }
 
-  function calc(s) {
+  function calc(s, sch) {
+    var fob = sch === 'FOB';
     var y = s.hasil > 0 ? s.hasil : NaN;
     var sus = 1 + s.susut / 100;
-    var upah = s.cutting + s.jahit + s.finishing + s.benang + s.plastik + s.lain;
-    var fob = { kain: s.kain / y * sus, rib: (s.kain + s.ribSel) * s.ribRol / (s.rol * y) * sus };
-    var cmt = { kain: 0, rib: 0 };
-    [fob, cmt].forEach(function (c) {
-      c.upah = upah;
-      c.reject = (c.kain + c.rib + c.upah) * s.reject / 100;
-      c.over = s.overhead;
-      c.hpp = c.kain + c.rib + c.upah + c.reject + c.over;
-      c.target = labaFor(c.hpp, s.mode === 'rp' ? s.target : s.targetPct, s.mode);
-      c.harga = roundUp(c.hpp + c.target, s.bulat);
-      c.laba = c.harga - c.hpp;
-      c.margin = c.laba / c.harga;
-      c.modal = c.hpp * s.qty;
-      c.omzet = c.harga * s.qty;
-      c.labaTotal = c.laba * s.qty;
-    });
-    return { fob: fob, cmt: cmt, upah: upah };
+    var c = {};
+    c.kain = fob ? s.kain / y * sus : 0;
+    c.rib = fob ? (s.kain + s.ribSel) * s.ribRol / (s.rol * y) * sus : 0;
+    c.kerja = s.cutting + s.making + s.trimming;
+    c.custom = s.custom.reduce(function (a, x) { return a + x.v; }, 0);
+    c.reject = (c.kain + c.rib + c.kerja) * s.reject / 100;
+    c.hpp = c.kain + c.rib + c.kerja + c.custom + c.reject;
+    c.target = labaFor(c.hpp, s.mode === 'rp' ? s.target : s.targetPct, s.mode);
+    c.hargaAuto = roundUp(c.hpp + c.target, s.bulat);
+    c.harga = s.hargaFix > 0 ? s.hargaFix : c.hargaAuto;
+    c.laba = c.harga - c.hpp;
+    c.margin = c.laba / c.harga;
+    c.modal = c.hpp * s.qty;
+    c.omzet = c.harga * s.qty;
+    c.labaTotal = c.laba * s.qty;
+    return c;
   }
 
-  function n(x) { return isFinite(x) ? Math.round(x).toLocaleString('id-ID') : '-'; }
-  function rp(x) { return isFinite(x) ? 'Rp ' + (x < 0 ? '-' : '') + Math.abs(Math.round(x)).toLocaleString('id-ID') : '-'; }
-  function pct(x) { return isFinite(x) ? (x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '%' : '-'; }
+  /* ---------- Isian ---------- */
+  function selectHTML(key, list) {
+    var h = '<select id="f-' + key + '" data-k="' + key + '">';
+    list.forEach(function (m) { h += '<option value="' + m[0] + '"' + (state[key] === m[0] ? ' selected' : '') + '>' + esc(m[1]) + '</option>'; });
+    return h + '</select>';
+  }
+  function fieldHTML(f) {
+    var key = f[0], label = f[1], kind = f[2], hint = f[3];
+    var h = '<div class="field' + (kind === 'area' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
+    if (kind === 'mode') h += selectHTML(key, MODES);
+    else if (kind === 'pdf') h += selectHTML(key, PDFMODES);
+    else if (kind === 'area') h += '<textarea class="txt" rows="3" id="f-' + key + '" data-k="' + key + '">' + esc(state[key]) + '</textarea>';
+    else if (kind === 'text') h += '<input type="text" class="txt" id="f-' + key + '" data-k="' + key + '" value="' + esc(state[key]) + '">';
+    else h += '<input type="text" class="num" inputmode="decimal" autocomplete="off" id="f-' + key + '" data-k="' + key + '" value="' + fmtIn(state[key]) + '">';
+    if (hint) h += '<div class="hint">' + esc(hint) + '</div>';
+    return h + '</div>';
+  }
+  function card(title, sub, fields, extra, id) {
+    return '<div class="card"' + (id ? ' id="' + id + '"' : '') + '><h2>' + esc(title) + '</h2>' + (sub ? '<p class="sub">' + esc(sub) + '</p>' : '') +
+      fields.map(fieldHTML).join('') + (extra || '') + '</div>';
+  }
 
-  function row(label, a, b, cls) {
-    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + label + '</td><td>' + a + '</td><td>' + b + '</td></tr>';
+  function buildInputs() {
+    var fob = scheme === 'FOB';
+    var h = '';
+    h += card('Order', null, [['nama', 'Nama produk', 'text'], ['brand', 'Untuk brand (opsional)', 'text'], ['qty', 'Jumlah order (pcs)']]);
+    if (fob) {
+      h += card('Bahan', 'Harga kain per kg dan hasilnya.', [
+        ['kain', 'Harga kain per kg (Rp)'],
+        ['hasil', 'Hasil kain (pcs per kg)', null, 'Rata-rata semua ukuran. Untuk ukuran L sekitar 3,0.']
+      ]);
+      h += card('Rib', 'Rib dihitung dari satu rol kain.', [
+        ['rol', 'Berat satu rol kain (kg)'],
+        ['ribRol', 'Kebutuhan rib per rol (kg)'],
+        ['ribSel', 'Selisih harga rib per kg (Rp)', null, 'Rib lebih mahal dari kain']
+      ]);
+    }
+    h += card('Biaya pengerjaan', 'Cutting, making, trimming. Rupiah per pcs.', [
+      ['cutting', 'Cutting'], ['making', 'Making (jahit)'], ['trimming', 'Trimming (finishing, benang)']
+    ], '<div class="total"><span>Total pengerjaan</span><span id="x-kerja"></span></div>');
+    h += '<div class="card" id="c-custom"><h2>Custom: biaya lain</h2>' +
+      '<p class="sub">Plastik, overhead, atau biaya apa saja per pcs. Tambah atau hapus sesuai kebutuhan.</p>' +
+      '<div id="custom-rows"></div>' +
+      '<div class="actions" style="margin-top:6px"><button type="button" id="b-add">+ Tambah biaya</button></div>' +
+      '<div class="total"><span>Total biaya lain</span><span id="x-custom"></span></div></div>';
+    h += card('Target laba', null, [
+      ['mode', 'Target laba dihitung dari', 'mode'],
+      ['target', 'Target laba bersih (Rp per pcs)'],
+      ['hargaFix', 'Harga jual sesuai kesepakatan (Rp per pcs)', null, 'Isi kalau harga sudah disepakati dengan brand. Laba, margin, dan surat penawaran ikut berubah. Isi 0 untuk memakai harga hasil hitungan.'],
+      ['targetPct', 'Target laba bersih (%)', null, 'Untuk CMT, persen dihitung dari biaya pengerjaan saja, jadi labanya kecil. Untuk CMT lebih aman pakai Rupiah per pcs.']
+    ]);
+    h += card('Surat penawaran', 'Dipakai untuk PDF surat penawaran dengan kop.', [
+      ['usaha', 'Nama usaha', 'text'], ['alamat', 'Alamat usaha', 'area'], ['telp', 'Telepon / WhatsApp', 'text'],
+      ['nomor', 'Nomor surat (kosongkan untuk otomatis)', 'text'], ['up', 'Kepada, u.p. (nama kontak brand)', 'text'],
+      ['spek', 'Spesifikasi produk', 'area'], ['berlaku', 'Masa berlaku penawaran (hari)'],
+      ['termasuk', 'Harga sudah termasuk (kosongkan untuk teks otomatis)', 'area'],
+      ['belum', 'Harga belum termasuk', 'area'], ['bayar', 'Syarat pembayaran', 'area'],
+      ['kirim', 'Pengiriman dan waktu produksi', 'area'], ['ketentuan', 'Ketentuan lain', 'area'],
+      ['ttd', 'Nama penandatangan (kosong: nama usaha)', 'text']
+    ]);
+    var more = [];
+    if (fob) more.push(['susut', 'Cadangan susut kain (%)', null, 'Tambah 1-3% kalau ada sisa potongan']);
+    more.push(['reject', 'Cadangan reject (%)', null, 'Persen dari biaya kain dan pengerjaan untuk barang cacat']);
+    more.push(['bulat', 'Pembulatan harga jual (Rp)', null, 'Harga jual dibulatkan ke atas']);
+    h += '<div class="card"><details><summary>Pengaturan tambahan</summary>' + more.map(fieldHTML).join('') + '</details></div>';
+    document.getElementById('col-inputs').innerHTML = h;
+    renderCustom();
+
+    document.getElementById('col-pdf').innerHTML =
+      '<h2>PDF dan cetak</h2><p class="sub">Bagikan hasilnya ke brand atau simpan sebagai PDF.</p>' +
+      [['pdfMode', 'Isi PDF', 'pdf']].map(fieldHTML).join('') +
+      '<div class="actions"><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-print">Cetak</button></div>' +
+      '<p class="note" id="pdf-note"></p>' +
+      '<div class="actions"><button type="button" id="b-reset">Kembalikan ke contoh</button></div>';
+  }
+
+  function renderCustom() {
+    var box = document.getElementById('custom-rows');
+    if (!box) return;
+    box.innerHTML = state.custom.map(function (c, i) {
+      return '<div class="crow">' +
+        '<input type="text" class="txt" data-ci="' + i + '" data-cf="n" placeholder="Nama biaya" aria-label="Nama biaya ' + (i + 1) + '" value="' + esc(c.n) + '">' +
+        '<input type="text" class="num" inputmode="decimal" autocomplete="off" data-ci="' + i + '" data-cf="v" aria-label="Biaya per pcs ' + (i + 1) + '" value="' + fmtIn(c.v) + '">' +
+        '<button type="button" class="x" data-del="' + i + '" aria-label="Hapus biaya ' + (i + 1) + '">&times;</button></div>';
+    }).join('') || '<p class="note">Belum ada biaya custom.</p>';
+  }
+
+  /* ---------- Tampilan hasil ---------- */
+  function row(label, val, cls) {
+    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + esc(label) + '</td><td>' + val + '</td></tr>';
+  }
+  function parts(c) {
+    var p = [];
+    if (scheme === 'FOB') { p.push(['Kain', c.kain]); p.push(['Rib', c.rib]); }
+    p.push(['Cutting', state.cutting]); p.push(['Making (jahit)', state.making]); p.push(['Trimming', state.trimming]);
+    state.custom.forEach(function (x) { if (x.v > 0 || x.n) p.push([x.n || 'Biaya lain', x.v]); });
+    if (c.reject > 0) p.push(['Cadangan reject', c.reject]);
+    return p;
+  }
+  function targetLabel() {
+    return state.mode === 'rp' ? 'Target laba' : 'Target laba (' + fmtIn(state.targetPct) + '% ' + (state.mode === 'markup' ? 'dari biaya' : 'dari harga jual') + ')';
   }
 
   function render() {
-    var r = calc(state), f = r.fob, c = r.cmt;
-    document.getElementById('x-upah').textContent = rp(r.upah);
-    document.getElementById('f-target').parentNode.hidden = state.mode !== 'rp';
-    document.getElementById('f-targetPct').parentNode.hidden = state.mode === 'rp';
+    var c = calc(state, scheme);
+    var el;
+    el = document.getElementById('x-kerja'); if (el) el.textContent = rp(c.kerja);
+    el = document.getElementById('x-custom'); if (el) el.textContent = rp(c.custom);
+    el = document.getElementById('f-target'); if (el) el.parentNode.hidden = state.mode !== 'rp';
+    el = document.getElementById('f-targetPct'); if (el) el.parentNode.hidden = state.mode === 'rp';
 
-    document.getElementById('t-fob').textContent = rp(f.harga);
-    document.getElementById('t-cmt').textContent = rp(c.harga);
-    document.getElementById('t-fob-s').textContent = 'Laba ' + rp(f.laba) + ' per pcs, margin ' + pct(f.margin);
-    document.getElementById('t-cmt-s').textContent = 'Laba ' + rp(c.laba) + ' per pcs, margin ' + pct(c.margin);
-
+    document.getElementById('t-v').textContent = rp(c.harga);
+    document.getElementById('t-s').textContent = 'Laba ' + rp(c.laba) + ' per pcs, margin ' + pct(c.margin);
     document.getElementById('r-sub').textContent = (state.nama ? state.nama + ', ' : '') + n(state.qty) + ' pcs';
 
-    var tl = state.mode === 'rp' ? '' : ' (' + fmtIn(state.targetPct) + '% ' + (state.mode === 'markup' ? 'dari biaya' : 'dari harga jual') + ')';
-    document.getElementById('r-body').innerHTML =
-      row('Kain', n(f.kain), n(c.kain)) +
-      row('Rib', n(f.rib), n(c.rib)) +
-      row('Upah dan bahan pendukung', n(f.upah), n(c.upah)) +
-      row('Cadangan reject', n(f.reject), n(c.reject)) +
-      row('Overhead', n(f.over), n(c.over)) +
-      row('Total biaya per pcs', n(f.hpp), n(c.hpp), 'strong sep') +
-      row('Target laba' + tl, n(f.target), n(c.target)) +
-      row('Harga jual', n(f.harga), n(c.harga), 'hl') +
-      row('Laba per pcs', n(f.laba), n(c.laba)) +
-      row('Margin', pct(f.margin), pct(c.margin));
+    var h = parts(c).map(function (p) { return row(p[0], n(p[1])); }).join('');
+    h += row('Total biaya per pcs', n(c.hpp), 'strong sep') +
+      row(targetLabel(), n(c.target)) +
+      row('Harga jual', n(c.harga), 'hl') +
+      row('Laba per pcs', n(c.laba)) +
+      row('Margin', pct(c.margin));
+    document.getElementById('r-body').innerHTML = h;
 
     document.getElementById('r-total').innerHTML =
-      row('Modal total', rp(f.modal), rp(c.modal), 'strong') +
-      row('Omzet total', rp(f.omzet), rp(c.omzet)) +
-      row('Laba total', rp(f.labaTotal), rp(c.labaTotal), 'hl') +
-      row('Margin total', pct(f.margin), pct(c.margin));
+      row('Modal total', rp(c.modal), 'strong') +
+      row('Omzet total', rp(c.omzet)) +
+      row('Laba total', rp(c.labaTotal), 'hl') +
+      row('Margin total', pct(c.margin));
+  }
+
+  /* ---------- Dokumen PDF dan cetak ---------- */
+  function docData() {
+    var c = calc(state, scheme), fob = scheme === 'FOB';
+    var date = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    var skemaTxt = fob ? 'FOB (kain dari konveksi)' : 'CMT (kain dari brand)';
+    var d = { meta: [['Tanggal', date], ['Untuk', state.brand || '-'], ['Dari', state.usaha || '-'], ['Produk', state.nama || '-'], ['Skema', skemaTxt]], sections: [], note: '' };
+    if (state.pdfMode === 'internal') {
+      d.title = 'Rincian Hitung Harga Konveksi (Internal)';
+      d.file = 'rincian-' + scheme;
+      d.sections.push({ head: 'Biaya per pcs', rows: parts(c).map(function (p) { return { l: p[0], v: rp(p[1]) }; }).concat([{ l: 'Total biaya per pcs', v: rp(c.hpp), b: 1 }]) });
+      d.sections.push({ head: 'Harga dan laba per pcs', rows: [
+        { l: targetLabel(), v: rp(c.target) },
+        { l: 'Harga jual', v: rp(c.harga), b: 1 },
+        { l: 'Laba per pcs', v: rp(c.laba) },
+        { l: 'Margin', v: pct(c.margin) }
+      ] });
+      d.sections.push({ head: 'Total satu order (' + n(state.qty) + ' pcs)', rows: [
+        { l: 'Modal total', v: rp(c.modal), b: 1 },
+        { l: 'Omzet total', v: rp(c.omzet) },
+        { l: 'Laba total', v: rp(c.labaTotal), b: 1 },
+        { l: 'Margin total', v: pct(c.margin) }
+      ] });
+      d.note = 'Dokumen internal. Jangan dikirim ke brand.';
+    } else {
+      d.title = 'Penawaran Harga Konveksi';
+      d.file = 'penawaran-' + scheme;
+      d.sections.push({ head: 'Harga', rows: [
+        { l: 'Jumlah order', v: n(state.qty) + ' pcs' },
+        { l: 'Harga per pcs', v: rp(c.harga), b: 1, big: 1 },
+        { l: 'Total harga', v: rp(c.omzet), b: 1 }
+      ] });
+      d.note = fob ? 'Harga sudah termasuk kain, rib, dan biaya pengerjaan.' : 'Harga untuk jasa pengerjaan (cutting, making, trimming). Kain disediakan oleh brand.';
+    }
+    var slug = (state.nama || 'produk').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'produk';
+    d.file = d.file + '-' + slug + '.pdf';
+    return d;
+  }
+
+  function makePdf(d) {
+    var J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) return null;
+    var doc = new J({ unit: 'mm', format: 'a4' });
+    var L = 18, R = 192, y = 22;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(0);
+    doc.text(d.title, L, y); y += 9;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    d.meta.forEach(function (m) {
+      doc.setTextColor(110); doc.text(m[0], L, y);
+      doc.setTextColor(0); doc.text(String(m[1]), L + 24, y);
+      y += 5.5;
+    });
+    y += 5;
+    d.sections.forEach(function (sec) {
+      if (y > 250) { doc.addPage(); y = 22; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0);
+      doc.text(sec.head, L, y); y += 2.5;
+      doc.setDrawColor(15, 107, 99); doc.setLineWidth(0.6); doc.line(L, y, R, y); y += 7;
+      sec.rows.forEach(function (rw) {
+        if (y > 280) { doc.addPage(); y = 22; }
+        doc.setFont('helvetica', rw.b ? 'bold' : 'normal');
+        doc.setFontSize(rw.big ? 16 : 10.5);
+        doc.setTextColor(0);
+        doc.text(String(rw.l), L, y);
+        doc.text(String(rw.v), R, y, { align: 'right' });
+        y += rw.big ? 10 : 6.5;
+      });
+      y += 5;
+    });
+    if (d.note) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(90);
+      var lines = doc.splitTextToSize(d.note, R - L);
+      doc.text(lines, L, y);
+    }
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text('Dibuat dengan Kalkulator Harga Konveksi', L, 288);
+    return doc;
+  }
+
+  function quoteData() {
+    var c = calc(state, scheme), fob = scheme === 'FOB', now = new Date();
+    function dt(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
+    function en(x) { return isFinite(x) ? Math.round(x).toLocaleString('en-US') : '-'; }
+    function pad(x) { return (x < 10 ? '0' : '') + x; }
+    var until = new Date(now.getTime() + (state.berlaku || 0) * 86400000);
+    var termasuk = state.termasuk || (fob ? 'Fabric, rib, cutting, making, trimming, and packaging plastic.' : 'Cutting, making, and trimming services and packaging plastic. Fabric is supplied by the buyer.');
+    return {
+      usaha: state.usaha, alamat: state.alamat, telp: state.telp,
+      nomor: state.nomor || ('QT-' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate())),
+      tanggal: dt(now), berlaku: state.berlaku > 0 ? dt(until) : '',
+      kepada: state.brand || '-', up: state.up,
+      perihal: 'Price quotation for ' + (state.nama || 'product') + ' (' + scheme + ')',
+      produk: state.nama || '-', spek: state.spek, qty: en(state.qty) + ' pcs', harga: 'Rp ' + en(c.harga), total: 'Rp ' + en(c.omzet),
+      notes: [['Price includes', termasuk], ['Price excludes', state.belum], ['Payment terms', state.bayar],
+        ['Delivery and production time', state.kirim], ['Other terms', state.ketentuan]].filter(function (x) { return x[1] && String(x[1]).trim(); }),
+      ttd: state.ttd || state.usaha
+    };
+  }
+
+  function makeQuotePdf(q) {
+    var J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) return null;
+    var doc = new J({ unit: 'mm', format: 'a4' });
+    var L = 18, R = 192, W = R - L, y = 14, B = [3, 87, 166];
+    var lh = 52 * LOGO_RATIO;
+    try { doc.addImage(LOGO, 'PNG', L, y, 52, lh); } catch (e) {}
+    var kx = 78, ky = y + 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(0);
+    doc.text(q.usaha || '', kx, ky); ky += 5.5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(60);
+    if (q.alamat) { var al = doc.splitTextToSize(q.alamat, R - kx); doc.text(al, kx, ky); ky += al.length * 4.6; }
+    if (q.telp) { doc.text('Tel/WhatsApp: ' + q.telp, kx, ky); ky += 4.6; }
+    y = Math.max(y + lh, ky) + 4;
+    doc.setDrawColor(B[0], B[1], B[2]); doc.setLineWidth(1); doc.line(L, y, R, y); y += 11;
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0);
+    doc.text('QUOTATION', L, y); y += 8;
+    var meta = [['No.', q.nomor], ['Date', q.tanggal]];
+    if (q.berlaku) meta.push(['Valid until', q.berlaku]);
+    meta.push(['To', q.kepada + (q.up ? ' (Attn: ' + q.up + ')' : '')]);
+    meta.push(['Subject', q.perihal]);
+    doc.setFontSize(10);
+    meta.forEach(function (m) {
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(110); doc.text(m[0], L, y);
+      doc.setTextColor(0);
+      var ls = doc.splitTextToSize(String(m[1]), W - 28); doc.text(ls, L + 28, y);
+      y += ls.length * 5 + 0.8;
+    });
+    y += 5;
+
+    doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255);
+    doc.text('Product', L + 2, y); doc.text('Specification', L + 46, y);
+    doc.text('Quantity', L + 120, y, { align: 'right' }); doc.text('Unit price', L + 146, y, { align: 'right' }); doc.text('Total', L + 172, y, { align: 'right' });
+    y += 8;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0);
+    var pl = doc.splitTextToSize(q.produk, 40), sl = doc.splitTextToSize(q.spek || '-', 50);
+    var rh = Math.max(pl.length, sl.length) * 5 + 2;
+    doc.text(pl, L + 2, y); doc.text(sl, L + 46, y);
+    doc.text(q.qty, L + 120, y, { align: 'right' }); doc.text(q.harga, L + 146, y, { align: 'right' });
+    doc.setFont('helvetica', 'bold'); doc.text(q.total, L + 172, y, { align: 'right' });
+    y += rh; doc.setDrawColor(200); doc.setLineWidth(0.3); doc.line(L, y - 3, R, y - 3); y += 7;
+
+    q.notes.forEach(function (nt) {
+      doc.setFontSize(10);
+      var ls = doc.splitTextToSize(String(nt[1]), W);
+      if (y + 6 + ls.length * 4.8 > 272) { doc.addPage(); y = 22; }
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text(nt[0], L, y); y += 5;
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40); doc.text(ls, L, y); y += ls.length * 4.8 + 4;
+    });
+
+    if (y > 232) { doc.addPage(); y = 22; }
+    y += 6; doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Sincerely,', L, y); doc.text('Approved by,', R - 60, y);
+    y += 26; doc.setDrawColor(0); doc.setLineWidth(0.3);
+    doc.line(L, y - 5, L + 55, y - 5); doc.line(R - 60, y - 5, R, y - 5);
+    doc.setFont('helvetica', 'bold'); doc.text(q.ttd || '', L, y);
+    doc.setFont('helvetica', 'normal'); doc.text('(Name and date)', R - 60, y);
+    return doc;
+  }
+
+  function quoteHTML(q) {
+    function br(t) { return esc(t || '').replace(/\n/g, '<br>'); }
+    var h = '<div class="kop"><img src="' + LOGO + '" alt=""><div class="a"><b>' + esc(q.usaha || '') + '</b>' +
+      (q.alamat ? '<br>' + br(q.alamat) : '') + (q.telp ? '<br>Tel/WhatsApp: ' + esc(q.telp) : '') + '</div></div>';
+    h += '<h1>QUOTATION</h1>';
+    h += '<div class="m"><b>No.</b>' + esc(q.nomor) + '</div><div class="m"><b>Date</b>' + esc(q.tanggal) + '</div>';
+    if (q.berlaku) h += '<div class="m"><b>Valid until</b>' + esc(q.berlaku) + '</div>';
+    h += '<div class="m"><b>To</b>' + esc(q.kepada + (q.up ? ' (Attn: ' + q.up + ')' : '')) + '</div>';
+    h += '<div class="m"><b>Subject</b>' + esc(q.perihal) + '</div>';
+    h += '<table class="q"><thead><tr><th>Product</th><th>Specification</th><th style="text-align:right">Quantity</th><th style="text-align:right">Unit price</th><th style="text-align:right">Total</th></tr></thead><tbody><tr>' +
+      '<td>' + esc(q.produk) + '</td><td>' + br(q.spek || '-') + '</td><td style="text-align:right">' + esc(q.qty) + '</td><td style="text-align:right">' + esc(q.harga) + '</td><td style="text-align:right"><b>' + esc(q.total) + '</b></td></tr></tbody></table>';
+    q.notes.forEach(function (nt) { h += '<div class="nt"><b>' + esc(nt[0]) + '</b>' + br(nt[1]) + '</div>'; });
+    h += '<div class="ttd"><div>Sincerely,<div class="sp"></div><b>' + esc(q.ttd || '') + '</b></div><div>Approved by,<div class="sp"></div>(Name and date)</div></div>';
+    return h;
+  }
+
+  function setNote(t) { var el = document.getElementById('pdf-note'); if (el) el.textContent = t; }
+
+  function sharePdf() {
+    var d = docData();
+    var doc;
+    try { doc = state.pdfMode === 'internal' ? makePdf(d) : makeQuotePdf(quoteData()); } catch (e) { doc = null; }
+    if (!doc) { setNote('PDF belum bisa dibuat. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
+    var blob = doc.output('blob');
+    var file;
+    try { file = new File([blob], d.file, { type: 'application/pdf' }); } catch (e) { file = null; }
+    function fallback() {
+      try {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = d.file; a.target = '_blank';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
+        setNote('PDF dibuat. Kalau tidak terbuka sendiri, cek folder Unduhan atau aplikasi File.');
+      } catch (e) {
+        setNote('Unduh PDF tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.');
+      }
+    }
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: d.title }).then(function () { setNote('PDF dibagikan.'); }, function (err) {
+        if (err && err.name === 'AbortError') setNote('');
+        else fallback();
+      });
+    } else fallback();
+  }
+
+  function printSheet() {
+    var d = docData();
+    var h;
+    if (state.pdfMode !== 'internal') {
+      document.getElementById('sheet').innerHTML = quoteHTML(quoteData());
+      try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
+      return;
+    }
+    h = '<h1>' + esc(d.title) + '</h1>';
+    d.meta.forEach(function (m) { h += '<div class="m"><b>' + esc(m[0]) + '</b>' + esc(m[1]) + '</div>'; });
+    d.sections.forEach(function (s) {
+      h += '<h2>' + esc(s.head) + '</h2><table>';
+      s.rows.forEach(function (r) {
+        h += '<tr><td' + (r.big ? ' class="big"' : '') + (r.b ? ' style="font-weight:700"' : '') + '>' + esc(r.l) + '</td><td style="text-align:right;' + (r.b ? 'font-weight:700;' : '') + '"' + (r.big ? ' class="big"' : '') + '>' + esc(r.v) + '</td></tr>';
+      });
+      h += '</table>';
+    });
+    if (d.note) h += '<div class="n">' + esc(d.note) + '</div>';
+    h += '<div class="f">Dibuat dengan Kalkulator Harga Konveksi</div>';
+    document.getElementById('sheet').innerHTML = h;
+    try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
+  }
+
+  /* ---------- Layar ---------- */
+  function enter(sch) {
+    scheme = sch;
+    var fob = sch === 'FOB';
+    document.getElementById('v-home').hidden = true;
+    document.getElementById('v-calc').hidden = false;
+    document.getElementById('badge').textContent = sch;
+    document.getElementById('calc-title').textContent = fob ? 'Hitung harga FOB' : 'Hitung harga CMT';
+    document.getElementById('calc-lead').textContent = fob ? 'Konveksi membeli kain. Isi bahan, rib, pengerjaan, dan biaya custom.' : 'Kain dari brand. Isi biaya pengerjaan dan biaya custom.';
+    document.getElementById('t-k').textContent = 'Harga jual ' + sch;
+    document.getElementById('tile').className = 'tile' + (fob ? '' : ' cmt');
+    buildInputs();
+    render();
+    window.scrollTo(0, 0);
+  }
+  function home() {
+    scheme = null;
+    document.getElementById('v-calc').hidden = true;
+    document.getElementById('v-home').hidden = false;
+    window.scrollTo(0, 0);
   }
 
   function onInput(e) {
-    var el = e.target, k = el.getAttribute && el.getAttribute('data-k');
+    var el = e.target;
+    if (!el || !el.getAttribute) return;
+    var ci = el.getAttribute('data-ci');
+    if (ci !== null) {
+      var item = state.custom[+ci];
+      if (!item) return;
+      if (el.getAttribute('data-cf') === 'n') item.n = el.value;
+      else item.v = parseNum(el.value);
+      save(); render();
+      return;
+    }
+    var k = el.getAttribute('data-k');
     if (!k) return;
-    if (el.tagName === 'SELECT') state[k] = el.value;
-    else if (el.classList.contains('txt')) state[k] = el.value;
+    if (el.tagName === 'SELECT' || el.classList.contains('txt')) state[k] = el.value;
     else state[k] = parseNum(el.value);
-    save();
-    render();
+    save(); render();
   }
 
-  function syncInputs() {
-    Object.keys(DEF).forEach(function (k) {
-      var el = document.getElementById('f-' + k);
-      if (el) el.value = (el.tagName === 'SELECT' || el.classList.contains('txt')) ? state[k] : fmtIn(state[k]);
-    });
-  }
-
-  build();
   document.addEventListener('input', onInput);
   document.addEventListener('change', onInput);
 
@@ -405,15 +780,33 @@ tr.sep td { border-top: 2px solid var(--line); }
   });
 
   document.addEventListener('click', function (e) {
-    if (e.target && e.target.id === 'b-reset') {
-      var k;
-      for (k in DEF) state[k] = DEF[k];
-      syncInputs(); save(); render();
-      document.getElementById('copy-note').textContent = 'Isian dikembalikan ke contoh kaos polos 24s.';
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var ch = t.closest('[data-scheme]');
+    if (ch) { enter(ch.getAttribute('data-scheme')); return; }
+    var del = t.closest('[data-del]');
+    if (del) {
+      state.custom.splice(+del.getAttribute('data-del'), 1);
+      save(); renderCustom(); render();
+      return;
+    }
+    var id = t.id;
+    if (id === 'b-back') home();
+    else if (id === 'b-add') {
+      state.custom.push({ n: '', v: 0 });
+      save(); renderCustom(); render();
+      var rows = document.querySelectorAll('#custom-rows .crow input.txt');
+      if (rows.length) rows[rows.length - 1].focus();
+    }
+    else if (id === 'b-share') sharePdf();
+    else if (id === 'b-print') printSheet();
+    else if (id === 'b-reset') {
+      state = copyDef();
+      save(); buildInputs(); render();
+      setNote('Isian dikembalikan ke contoh kaos polos 24s.');
     }
   });
 
-  render();
 })();
 </script>
 </body>
