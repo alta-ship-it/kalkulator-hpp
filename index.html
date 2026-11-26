@@ -504,7 +504,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var d = { meta: [['Tanggal', date], ['Untuk', state.brand || '-'], ['Dari', state.usaha || '-'], ['Produk', state.nama || '-'], ['Skema', skemaTxt]], sections: [], note: '' };
     if (state.pdfMode === 'internal') {
       d.title = 'Rincian Hitung Harga Konveksi (Internal)';
-      d.file = 'rincian-' + scheme;
+      d.file = 'Internal-Cost-Breakdown-' + scheme;
       d.sections.push({ head: 'Biaya per pcs', rows: parts(c).map(function (p) { return { l: p[0], v: rp(p[1]) }; }).concat([{ l: 'Total biaya per pcs', v: rp(c.hpp), b: 1 }]) });
       d.sections.push({ head: 'Harga dan laba per pcs', rows: [
         { l: targetLabel(), v: rp(c.target) },
@@ -520,8 +520,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       ] });
       d.note = 'Dokumen internal. Jangan dikirim ke brand.';
     } else {
-      d.title = 'Penawaran Harga Konveksi';
-      d.file = 'penawaran-' + scheme;
+      d.title = 'Quotation';
+      d.file = 'Quotation-' + scheme;
       d.sections.push({ head: 'Harga', rows: [
         { l: 'Jumlah order', v: n(state.qty) + ' pcs' },
         { l: 'Harga per pcs', v: rp(c.harga), b: 1, big: 1 },
@@ -529,7 +529,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       ] });
       d.note = fob ? 'Harga sudah termasuk kain, rib, dan biaya pengerjaan.' : 'Harga untuk jasa pengerjaan (cutting, making, trimming). Kain disediakan oleh brand.';
     }
-    var slug = (state.nama || 'produk').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'produk';
+    var slug = ((state.brand ? state.brand + ' ' : '') + (state.nama || 'product')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'product';
     d.file = d.file + '-' + slug + '.pdf';
     return d;
   }
