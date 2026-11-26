@@ -325,7 +325,7 @@ button.danger { color: var(--bad, #b3261e); }
 
 </div>
 <div id="sheet" aria-hidden="true"></div>
-<div id="pv" hidden><div class="bar"><b>Preview</b><button type="button" id="b-pv-share" class="primary">Bagikan PDF</button><button type="button" id="b-pv-close">Tutup</button></div><div class="scroll"><div class="holder" id="pv-holder"></div></div></div>
+<div id="pv" hidden><div class="bar"><b>Preview</b><button type="button" id="b-pv-save">Simpan</button><button type="button" id="b-pv-share" class="primary">Bagikan PDF</button><button type="button" id="b-pv-close">Tutup</button></div><div class="scroll"><div class="holder" id="pv-holder"></div></div></div>
 
 <script>
 (function () {
@@ -912,7 +912,7 @@ button.danger { color: var(--bad, #b3261e); }
         ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
         ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
       '<div class="hint" id="po-info"></div></div>' +
-      '<div class="actions"><button type="button" id="b-preview">Lihat preview</button><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-print">Cetak</button></div>' +
+      '<div class="actions"><button type="button" id="b-preview">Lihat preview</button><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-save">Simpan ke File</button><button type="button" id="b-print">Cetak</button></div>' +
       '<p class="note" id="pdf-note"></p>' +
       '<div class="actions"><button type="button" id="b-reset">Kembalikan ke contoh</button></div>';
   }
@@ -1561,6 +1561,7 @@ button.danger { color: var(--bad, #b3261e); }
   }
 
   var pendingFile = null;
+  var saveOnly = false;
   function shareFile(file, blob, name, title, msg) {
     function fallback() {
       try {
@@ -1569,11 +1570,12 @@ button.danger { color: var(--bad, #b3261e); }
         a.href = url; a.download = name; a.target = '_blank';
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
-        setNote(msg + ' Kalau tidak terbuka sendiri, cek folder Unduhan atau aplikasi File.');
+        setNote('PDF disimpan ke aplikasi File, folder Unduhan (Downloads): ' + name + '. Kalau yang muncul tampilan PDF, ketuk ikon Bagikan lalu Simpan ke File.');
       } catch (e) {
         setNote('Unduh PDF tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.');
       }
     }
+    if (saveOnly) { saveOnly = false; fallback(); return; }
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: title }).then(function () { pendingFile = null; setNote(msg); }, function (err) {
         if (err && err.name === 'AbortError') { setNote(''); return; }
@@ -1588,8 +1590,9 @@ button.danger { color: var(--bad, #b3261e); }
     } else fallback();
   }
 
+  function savePdf() { saveOnly = true; sharePdf(); }
   function sharePdf() {
-    if (pendingFile) { var pf = pendingFile; pendingFile = null; shareFile(pf.file, pf.blob, pf.name, pf.title, pf.msg); return; }
+    if (pendingFile && !saveOnly) { var pf = pendingFile; pendingFile = null; shareFile(pf.file, pf.blob, pf.name, pf.title, pf.msg); return; }
     var d = docData();
     var doc;
     if (state.pdfMode === 'sj' && !sjData()) { setNote('Pilih pengiriman untuk surat jalan. Buat dulu di kartu Pengiriman dan surat jalan.'); return; }
@@ -1851,6 +1854,7 @@ button.danger { color: var(--bad, #b3261e); }
     else if (id === 'b-ttd') document.getElementById('f-ttdfile').click();
     else if (id === 'b-ttd-del') { state.ttdImg = ''; save(); showTtd(); }
     else if (id === 'b-share' || id === 'b-pv-share') sharePdf();
+    else if (id === 'b-save' || id === 'b-pv-save') savePdf();
     else if (id === 'b-preview') openPreview();
     else if (id === 'b-pv-close') closePreview();
     else if (id === 'b-print') printSheet();
