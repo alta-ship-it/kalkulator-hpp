@@ -277,7 +277,11 @@ button.danger { color: var(--bad, #b3261e); }
     <h2 style="margin-top:28px">Order tersimpan</h2>
     <p class="note">Ketuk FOB atau CMT di atas untuk order baru. Ketuk order di bawah untuk melanjutkan.</p>
     <div id="order-list"></div>
-    <p class="note">Semua data tersimpan di HP ini saja.</p>
+    <div class="card" style="margin-top:20px"><h2>Cadangan data</h2>
+      <p class="sub">Semua order, vendor, tanda tangan, rekening, dan lampiran tersimpan di HP ini saja. Simpan cadangan ke Google Drive secara rutin, misalnya seminggu sekali.</p>
+      <div class="actions"><button type="button" class="primary" id="b-backup">Simpan cadangan</button><button type="button" id="b-restore">Pulihkan dari cadangan</button></div>
+      <input type="file" id="f-restore" accept=".json,application/json" hidden>
+      <p class="note" id="bk-note"></p></div>
   </div>
 
   <div id="v-calc" hidden>
@@ -443,6 +447,52 @@ button.danger { color: var(--bad, #b3261e); }
     }
     save(); renderOrders();
   }
+  /* ---------- Cadangan ---------- */
+  function bkNote(t) { var el = document.getElementById('bk-note'); if (el) el.textContent = t; }
+  function b64(buf) { var u = new Uint8Array(buf), s = ''; for (var i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return btoa(s); }
+  function unb64(s) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+  function backup() {
+    save();
+    var data = { app: 'pandera-kalkulator', ver: 1, at: new Date().toISOString(), state: state, orders: orders,
+      att: ALL.map(function (a) { var o = {}, k; for (k in a) o[k] = a[k]; if (a.buf) { o.buf = b64(a.buf); o.b64 = 1; } return o; }) };
+    var d = new Date(), pad = function (x) { return (x < 10 ? '0' : '') + x; };
+    var name = 'Pandera-cadangan-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.json';
+    var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    var file = null; try { file = new File([blob], name, { type: 'application/json' }); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: name }).then(function () { bkNote('Cadangan tersimpan: ' + name); }, function (err) {
+        if (err && err.name === 'AbortError') bkNote(''); else dl();
+      });
+    } else dl();
+    function dl() {
+      var url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
+      bkNote('Cadangan diunduh: ' + name + '. Pindahkan ke Google Drive.');
+    }
+  }
+  function restore(f) {
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var data;
+      try { data = JSON.parse(r.result); } catch (e) { data = null; }
+      if (!data || data.app !== 'pandera-kalkulator') { bkNote('File ini bukan cadangan kalkulator Pandera.'); return; }
+      var cnt = (data.orders && data.orders.list || []).length;
+      if (!confirm('Pulihkan cadangan tanggal ' + new Date(data.at).toLocaleDateString('id-ID') + ' (' + cnt + ' order)? Data di HP ini akan diganti.')) return;
+      try { localStorage.setItem(STORE, JSON.stringify(data.state)); localStorage.setItem(ORD, JSON.stringify(data.orders)); } catch (e) { bkNote('Gagal memulihkan: penyimpanan HP penuh.'); return; }
+      idb(function (db) {
+        if (!db) { location.reload(); return; }
+        var tx = db.transaction('files', 'readwrite'), st = tx.objectStore('files');
+        st.clear();
+        (data.att || []).forEach(function (a) { if (a.b64) { a.buf = unb64(a.buf); delete a.b64; } st.put(a); });
+        tx.oncomplete = function () { location.reload(); };
+        tx.onerror = function () { location.reload(); };
+      });
+    };
+    r.readAsText(f);
+  }
+
   function renderOrders() {
     var box = document.getElementById('order-list');
     if (!box) return;
@@ -1651,6 +1701,7 @@ button.danger { color: var(--bad, #b3261e); }
   function onInput(e) {
     var el = e.target;
     if (!el || !el.getAttribute) return;
+    if (el.id === 'f-restore') { if (e.type === 'change') { restore(el.files && el.files[0]); el.value = ''; } return; }
     if (el.id === 'f-attfile') { if (e.type === 'change') { addAttFiles(el.files); el.value = ''; } return; }
     if (el.type === 'checkbox' && el.getAttribute('data-k')) { state[el.getAttribute('data-k')] = el.checked; save(); return; }
     if (el.id === 'f-ttdfile') { if (e.type === 'change') { loadTtd(el.files && el.files[0]); el.value = ''; } return; }
@@ -1774,6 +1825,8 @@ button.danger { color: var(--bad, #b3261e); }
     }
     var id = t.id;
     if (id === 'b-back') home();
+    else if (id === 'b-backup') backup();
+    else if (id === 'b-restore') document.getElementById('f-restore').click();
     else if (id === 'b-gadd') { state.grid.push({ id: 'g' + Date.now().toString(36), w: '', q: {} }); save(); renderGrid(); renderDlv(); var gw = document.querySelectorAll('#grid-rows input[data-gf="w"]'); if (gw.length) gw[gw.length - 1].focus(); }
     else if (id === 'b-dadd') {
       var dn = { id: 'd' + Date.now().toString(36), no: nextNo('SJ'), tgl: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), koli: '', sopir: '', cat: '', q: {} };
