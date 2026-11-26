@@ -339,7 +339,7 @@ button.danger { color: var(--bad, #b3261e); }
     ttd: '', ttdImg: '',
     invNo: '', invPoRef: '', invQty: 0, invTempo: 14, invPajak: 0, invDP: 0,
     bank: '', rek: '', atasNama: '', invCatatan: 'Please include the invoice number in your transfer description.',
-    attQuote: true, attPo: true,
+    attQuote: true, attPo: true, invAttSj: true, invAttPo: true,
     orderId: '', scheme: '', brandAlamat: '', sizes: 'S, M, L, XL, XXL', grid: [], dlv: [], sjSel: '', invDlv: '', poNos: {},
     seq: { QT: 0, INV: 0, PO: 0, SJ: 0 },
     vendors: [], byCutting: '', byMaking: '', byTrimming: '',
@@ -397,7 +397,7 @@ button.danger { color: var(--bad, #b3261e); }
     return s;
   }
   var ORD = 'pandera-orders-v1';
-  var GLOBAL = ['usaha', 'alamat', 'telp', 'ttd', 'ttdImg', 'bank', 'rek', 'atasNama', 'vendors', 'seq', 'attQuote', 'attPo', 'pdfMode', 'bulat', 'invCatatan', 'poBayar', 'poCatatan'];
+  var GLOBAL = ['invAttSj', 'invAttPo', 'usaha', 'alamat', 'telp', 'ttd', 'ttdImg', 'bank', 'rek', 'atasNama', 'vendors', 'seq', 'attQuote', 'attPo', 'pdfMode', 'bulat', 'invCatatan', 'poBayar', 'poCatatan'];
   var orders = { list: [] };
   function perOrder(s) { var o = {}, k; for (k in s) if (GLOBAL.indexOf(k) < 0) o[k] = s[k]; return JSON.parse(JSON.stringify(o)); }
   function loadOrders() {
@@ -548,7 +548,9 @@ button.danger { color: var(--bad, #b3261e); }
         '<div class="field"><label>Kendaraan / sopir</label><input type="text" class="txt" data-di="' + i + '" data-df="sopir" value="' + esc(d.sopir || '') + '"></div>' +
         cells +
         '<div class="field full"><label>Catatan</label><textarea class="txt" rows="2" data-di="' + i + '" data-df="cat">' + esc(d.cat || '') + '</textarea></div>' +
-        '<div class="actions"><button type="button" data-dfill="' + i + '">Isi dengan semua sisa</button><button type="button" class="danger" data-ddel="' + i + '">Hapus pengiriman</button></div></details>';
+        '<div class="hint">' + (sjScanned(d) ? 'Foto surat jalan bertanda tangan sudah ada. Ini yang dilampirkan ke invoice.' : 'Setelah barang diterima, upload foto surat jalan yang sudah ditandatangani penerima.') + '</div>' +
+        '<div class="actions"><button type="button" data-dscan="' + i + '">' + (sjScanned(d) ? 'Ganti foto SJ bertanda tangan' : '+ Foto SJ bertanda tangan') + '</button>' +
+        '<button type="button" data-dfill="' + i + '">Isi dengan semua sisa</button><button type="button" class="danger" data-ddel="' + i + '">Hapus pengiriman</button></div></details>';
     }).join('');
     refreshDlvSelects();
   }
@@ -561,8 +563,8 @@ button.danger { color: var(--bad, #b3261e); }
       }).join('');
     });
   }
-  function sjData() {
-    var d = dlvById(state.sjSel);
+  function sjData(id) {
+    var d = dlvById(id || state.sjSel);
     if (!d) return null;
     var t = state.grid.length ? sizeTable(function (r, s) { return (d.q || {})[r.id + '|' + s]; }, true) : null;
     var meta = [['No. surat jalan', d.no], ['Tanggal', d.tgl || '-'], ['Kepada', (state.brand || '-') + (state.up ? ' (u.p. ' + state.up + ')' : '')]];
@@ -573,10 +575,11 @@ button.danger { color: var(--bad, #b3261e); }
     if (d.sopir) meta.push(['Kendaraan / sopir', d.sopir]);
     return { usaha: state.usaha, alamat: state.alamat, telp: state.telp, meta: meta, table: t, total: dlvTotal(d), cat: d.cat, ttd: state.ttd || state.usaha, ttdImg: state.ttdImg, no: d.no };
   }
-  function makeSjPdf(q) {
+  function makeSjPdf(q, into) {
     var J = window.jspdf && window.jspdf.jsPDF;
     if (!J) return null;
-    var doc = new J({ unit: 'mm', format: 'a4' });
+    var doc = into || new J({ unit: 'mm', format: 'a4' });
+    if (into) doc.addPage();
     var L = 18, R = 192, W = R - L;
     var y = kopPdf(doc, q, L, R);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0);
@@ -851,7 +854,10 @@ button.danger { color: var(--bad, #b3261e); }
         ['invTempo', 'Jatuh tempo (hari setelah invoice)'], ['invPajak', 'Pajak / PPN (%)', null, 'Isi 0 kalau tidak memungut PPN.'],
         ['invDP', 'Dikurangi DP yang sudah dibayar (Rp)'],
         ['bank', 'Nama bank', 'text'], ['rek', 'Nomor rekening', 'text'], ['atasNama', 'Atas nama rekening', 'text'],
-        ['invCatatan', 'Catatan di invoice', 'area']].map(fieldHTML).join('') + '</div>' +
+        ['invCatatan', 'Catatan di invoice', 'area']].map(fieldHTML).join('') +
+      '<div class="field full"><label>Lampiran invoice</label></div>' +
+      fieldHTML(['invAttPo', 'Lampirkan PO dari brand', 'check']) + fieldHTML(['invAttSj', 'Lampirkan surat jalan', 'check']) +
+      '<div class="actions"><button type="button" id="b-pobrand">+ Upload PO dari brand</button></div><div class="hint" id="inv-att"></div></div>' +
       '<div id="po-box">' + [['poVendor', 'Vendor tujuan PO', 'povendor'], ['poNomor', 'Nomor PO (kosongkan untuk otomatis)', 'text'],
         ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
         ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
@@ -894,7 +900,7 @@ button.danger { color: var(--bad, #b3261e); }
   function render() {
     showTtd();
     var c = calc(state, scheme);
-    var ib = document.getElementById('inv-box'); if (ib) ib.hidden = state.pdfMode !== 'invoice';
+    var ib = document.getElementById('inv-box'); if (ib) { ib.hidden = state.pdfMode !== 'invoice'; renderInvAtt(); }
     var sb = document.getElementById('sj-box'); if (sb) sb.hidden = state.pdfMode !== 'sj';
     var qe = document.getElementById('f-qty'); if (qe) qe.disabled = gridTotal(state.grid) > 0;
     var qn = document.getElementById('f-invQty'); if (qn) qn.parentNode.hidden = !!state.invDlv;
@@ -1080,12 +1086,18 @@ button.danger { color: var(--bad, #b3261e); }
     });
   }
   function putAtt(rec) {
-    rec.order = state.orderId; ALL.push(rec); renderAtt();
+    rec.order = state.orderId; if (!rec.tag) delete rec.tag; ALL.push(rec); renderAtt(); renderDlv(); renderInvAtt();
     idb(function (db) { if (db) db.transaction('files', 'readwrite').objectStore('files').put(rec); });
   }
   function delAtt(id) {
-    ALL = ALL.filter(function (a) { return a.id !== id; }); renderAtt();
+    ALL = ALL.filter(function (a) { return a.id !== id; }); renderAtt(); renderDlv(); renderInvAtt();
     idb(function (db) { if (db) db.transaction('files', 'readwrite').objectStore('files').delete(id); });
+  }
+  function renderInvAtt() {
+    var el = document.getElementById('inv-att');
+    if (!el) return;
+    var po = ATT.filter(function (a) { return a.tag === 'po-brand'; }).length, ds = invDeliveries();
+    el.textContent = 'PO brand: ' + (po ? po + ' file' : 'belum ada') + '. Surat jalan: ' + (ds.length ? ds.map(function (d) { return d.no + (sjScanned(d) ? ' (foto bertanda tangan)' : ' (dibuat otomatis)'); }).join(', ') : 'belum ada pengiriman') + '.';
   }
   function renderAtt() {
     ATT = ALL.filter(function (a) { return a.order === state.orderId; });
@@ -1093,15 +1105,17 @@ button.danger { color: var(--bad, #b3261e); }
     if (!box) return;
     box.innerHTML = ATT.map(function (a) {
       return '<div class="attrow">' + (a.kind === 'img' ? '<img src="' + a.data + '" alt="">' : '<div class="pdf">PDF</div>') +
-        '<div class="nm">' + esc(a.name) + '</div><button type="button" class="x" data-adel="' + esc(a.id) + '" aria-label="Hapus lampiran">&times;</button></div>';
+        '<div class="nm">' + (a.tag ? '<b>' + esc(tagLabel(a)) + ':</b> ' : '') + esc(a.name) + '</div><button type="button" class="x" data-adel="' + esc(a.id) + '" aria-label="Hapus lampiran">&times;</button></div>';
     }).join('') || '<p class="note">Belum ada lampiran.</p>';
   }
+  var attTag = '';
   function addAttFiles(list) {
+    var tag = attTag; attTag = '';
     Array.prototype.forEach.call(list || [], function (f, k) {
       var id = 'a' + Date.now().toString(36) + k;
       if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
         var fr = new FileReader();
-        fr.onload = function () { putAtt({ id: id, kind: 'pdf', name: f.name, buf: fr.result }); };
+        fr.onload = function () { putAtt({ id: id, kind: 'pdf', name: f.name, buf: fr.result, tag: tag }); };
         fr.readAsArrayBuffer(f);
         return;
       }
@@ -1112,7 +1126,7 @@ button.danger { color: var(--bad, #b3261e); }
           var s = Math.min(1, 1600 / Math.max(img.width, img.height));
           var cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
           var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
-          putAtt({ id: id, kind: 'img', name: f.name || 'Gambar', data: cv.toDataURL('image/jpeg', 0.82), w: cv.width, h: cv.height });
+          putAtt({ id: id, kind: 'img', name: f.name || 'Gambar', data: cv.toDataURL('image/jpeg', 0.82), w: cv.width, h: cv.height, tag: tag });
         };
         img.onerror = function () { setNote('Gambar ' + f.name + ' tidak bisa dibaca.'); };
         img.src = r.result;
@@ -1121,9 +1135,23 @@ button.danger { color: var(--bad, #b3261e); }
     });
   }
   function attFor(mode) {
-    if (mode === 'brand' && state.attQuote) return ATT;
-    if (mode === 'po' && state.attPo) return ATT;
+    var plain = ATT.filter(function (a) { return !a.tag; });
+    if (mode === 'brand' && state.attQuote) return plain;
+    if (mode === 'po' && state.attPo) return plain;
+    if (mode === 'invoice') {
+      var out = state.invAttPo ? ATT.filter(function (a) { return a.tag === 'po-brand'; }) : [];
+      if (state.invAttSj) invDeliveries().forEach(function (d) { out = out.concat(ATT.filter(function (a) { return a.tag === 'sj:' + d.id; })); });
+      return out;
+    }
     return [];
+  }
+  // Pengiriman yang ditagih: satu yang dipilih, atau semua kalau menagih seluruh order.
+  function invDeliveries() { var d = dlvById(state.invDlv); return d ? [d] : state.dlv.slice(); }
+  function sjScanned(d) { return ATT.some(function (a) { return a.tag === 'sj:' + d.id; }); }
+  function tagLabel(a) {
+    if (a.tag === 'po-brand') return 'PO brand';
+    if (a.tag && a.tag.indexOf('sj:') === 0) { var d = dlvById(a.tag.slice(3)); return 'Surat jalan TTD' + (d ? ' ' + d.no : ''); }
+    return '';
   }
   function attPagesPdf(doc, list, label) {
     var imgs = list.filter(function (a) { return a.kind === 'img'; });
@@ -1449,7 +1477,16 @@ button.danger { color: var(--bad, #b3261e); }
     if (m === 'sj') return makeSjPdf(sjData());
     if (m === 'internal') return makePdf(docData());
     if (m === 'po') { var doc = makePoPdf(poData()); if (doc) attPagesPdf(doc, attFor('po'), 'Lampiran'); return doc; }
-    if (m === 'invoice') return makeInvPdf(invData());
+    if (m === 'invoice') {
+      var di = makeInvPdf(invData());
+      if (!di) return null;
+      attPagesPdf(di, ATT.filter(function (a) { return state.invAttPo && a.tag === 'po-brand'; }), 'Customer PO');
+      if (state.invAttSj) invDeliveries().forEach(function (d) {
+        if (sjScanned(d)) attPagesPdf(di, ATT.filter(function (a) { return a.tag === 'sj:' + d.id; }), 'Delivery note ' + d.no);
+        else makeSjPdf(sjData(d.id), di);
+      });
+      return di;
+    }
     var dq = makeQuotePdf(quoteData()); if (dq) attPagesPdf(dq, attFor('brand'), 'Attachment'); return dq;
   }
 
@@ -1534,7 +1571,13 @@ button.danger { color: var(--bad, #b3261e); }
       if (!pq) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
       return go(poHTML(pq) + attPagesHTML(attFor('po'), 'Lampiran'));
     }
-    if (m === 'invoice') return go(invHTML(invData()));
+    if (m === 'invoice') {
+      var ih = invHTML(invData()) + attPagesHTML(ATT.filter(function (a) { return state.invAttPo && a.tag === 'po-brand'; }), 'Customer PO');
+      if (state.invAttSj) invDeliveries().forEach(function (d) {
+        ih += sjScanned(d) ? attPagesHTML(ATT.filter(function (a) { return a.tag === 'sj:' + d.id; }), 'Delivery note ' + d.no) : '<div class="att">' + sjHTML(sjData(d.id)) + '</div>';
+      });
+      return go(ih);
+    }
     if (m !== 'internal') return go(quoteHTML(quoteData()) + attPagesHTML(attFor('brand'), 'Attachment'));
     h = '<h1>' + esc(d.title) + '</h1>';
     d.meta.forEach(function (mm) { h += '<div class="m"><b>' + esc(mm[0]) + '</b>' + esc(mm[1]) + '</div>'; });
@@ -1694,6 +1737,12 @@ button.danger { color: var(--bad, #b3261e); }
     if (gd) { state.grid.splice(+gd.getAttribute('data-gdel'), 1); syncQty(); save(); renderGrid(); renderDlv(); render(); setField('qty'); return; }
     var dd = t.closest('[data-ddel]');
     if (dd) { if (!confirm('Hapus pengiriman ini?')) return; var gone = state.dlv.splice(+dd.getAttribute('data-ddel'), 1)[0]; if (gone && state.sjSel === gone.id) state.sjSel = ''; if (gone && state.invDlv === gone.id) state.invDlv = ''; save(); renderDlv(); render(); return; }
+    var ds = t.closest('[data-dscan]');
+    if (ds) {
+      var dd2 = state.dlv[+ds.getAttribute('data-dscan')];
+      ATT.filter(function (a) { return a.tag === 'sj:' + dd2.id; }).forEach(function (a) { delAtt(a.id); });
+      attTag = 'sj:' + dd2.id; document.getElementById('f-attfile').click(); return;
+    }
     var df = t.closest('[data-dfill]');
     if (df) {
       var dv = state.dlv[+df.getAttribute('data-dfill')], sz = sizeList();
@@ -1730,7 +1779,8 @@ button.danger { color: var(--bad, #b3261e); }
       var dn = { id: 'd' + Date.now().toString(36), no: nextNo('SJ'), tgl: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), koli: '', sopir: '', cat: '', q: {} };
       state.dlv.push(dn); state.sjSel = dn.id; save(); renderDlv(); render();
     }
-    else if (id === 'b-att') document.getElementById('f-attfile').click();
+    else if (id === 'b-att') { attTag = ''; document.getElementById('f-attfile').click(); }
+    else if (id === 'b-pobrand') { attTag = 'po-brand'; document.getElementById('f-attfile').click(); }
     else if (id === 'b-vadd') {
       state.vendors.push({ id: 'v' + Date.now().toString(36), n: '', a: '', t: '' });
       save(); renderVendors(); renderCustom(); refreshVendorSelects(); render();
