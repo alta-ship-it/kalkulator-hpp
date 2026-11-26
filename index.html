@@ -460,7 +460,7 @@ button.danger { color: var(--bad, #b3261e); }
     var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     var file = null; try { file = new File([blob], name, { type: 'application/json' }); } catch (e) {}
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: name }).then(function () { bkNote('Cadangan tersimpan: ' + name); }, function (err) {
+      navigator.share({ files: [file], title: name }).then(function () { bkNote('Cadangan dibagikan: ' + name + '. Di Drive, simpan ke folder Pandera Garmenindo > 6. Cadangan Data.'); }, function (err) {
         if (err && err.name === 'AbortError') bkNote(''); else dl();
       });
     } else dl();
@@ -1601,6 +1601,8 @@ button.danger { color: var(--bad, #b3261e); }
     var nImg = attFor(state.pdfMode).filter(function (a) { return a.kind === 'img'; }).length;
     function mk(b) { try { return new File([b], d.file, { type: 'application/pdf' }); } catch (e) { return null; } }
     var msg = 'PDF dibagikan' + (nImg + pdfs.length ? ' dengan ' + (nImg + pdfs.length) + ' lampiran.' : '.');
+    var FOLDER = { brand: '1. Quotation', po: '2. PO Subcon', sj: '3. Surat Jalan (DO)', invoice: '4. Invoice', internal: '5. Rincian Internal' };
+    msg += ' Kalau disimpan ke Drive, pilih folder Pandera Garmenindo > ' + FOLDER[state.pdfMode] + '.';
     if (!pdfs.length) { shareFile(mk(blob), blob, d.file, d.title, msg); return; }
     if (!window.PDFLib) { setNote('Lampiran PDF belum bisa digabung. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
     setNote('Menggabungkan lampiran PDF...');
