@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
 /* Layout idea: pilih skema dulu, lalu isian di kiri dan hasil di kanan (satu kolom di HP). */
 :root {
@@ -219,6 +220,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   #sheet .ttd div { width: 45%; }
   #sheet .ttd .sp { height: 60px; }
   #sheet .att { page-break-before: always; break-before: page; }
+  #sheet .pdfnote { display: none; }
   #sheet .att h3 { font-size: 13px; margin: 0 0 8px; }
   #sheet .att img { max-width: 100%; max-height: 240mm; }
   #sheet table.sum { margin-left: auto; width: 55%; font-size: 12px; margin-top: 6px; }
@@ -559,7 +561,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       '<div id="vendor-rows"></div>' +
       '<div class="actions" style="margin-top:6px"><button type="button" id="b-vadd">+ Tambah vendor</button></div></div>';
     h += '<div class="card" id="c-att"><h2>Lampiran: tech pack dan desain</h2>' +
-      '<p class="sub">Foto atau PDF dari brand. Foto dimasukkan sebagai halaman tambahan di PDF. File PDF ikut dikirim bersama saat Bagikan PDF.</p>' +
+      '<p class="sub">Foto atau PDF dari brand. Foto dan PDF dari brand digabung sebagai halaman tambahan di akhir PDF saat Bagikan PDF.</p>' +
       '<div id="att-rows"></div>' +
       '<input type="file" id="f-attfile" accept="image/*,application/pdf" multiple hidden>' +
       '<div class="actions" style="margin-top:6px"><button type="button" id="b-att">+ Tambah lampiran</button></div>' +
@@ -877,9 +879,13 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     });
   }
   function attPagesHTML(list, label) {
-    return list.filter(function (a) { return a.kind === 'img'; }).map(function (a, i) {
+    var h = list.filter(function (a) { return a.kind === 'img'; }).map(function (a, i) {
       return '<div class="att"><h3>' + esc(label + ' ' + (i + 1) + ': ' + a.name) + '</h3><img src="' + a.data + '" alt=""></div>';
     }).join('');
+    var pdfs = list.filter(function (a) { return a.kind === 'pdf'; });
+    if (pdfs.length) h += '<div class="att pdfnote"><h3>Lampiran PDF</h3>' + pdfs.map(function (a) { return esc(a.name); }).join('<br>') +
+      '<p style="color:#666;font-size:12px">Halaman PDF ini digabung ke file saat Bagikan PDF.</p></div>';
+    return h;
   }
 
   /* ---------- Invoice ---------- */
@@ -1119,13 +1125,13 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255);
     doc.text('Product', L + 2, y); doc.text('Specification', L + 46, y);
-    doc.text('Quantity', L + 120, y, { align: 'right' }); doc.text('Unit price', L + 146, y, { align: 'right' }); doc.text('Total', L + 172, y, { align: 'right' });
+    doc.text('Quantity', L + 108, y, { align: 'right' }); doc.text('Unit price', L + 138, y, { align: 'right' }); doc.text('Total', L + 172, y, { align: 'right' });
     y += 8;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0);
-    var pl = doc.splitTextToSize(q.produk, 40), sl = doc.splitTextToSize(q.spek || '-', 50);
+    var pl = doc.splitTextToSize(q.produk, 40), sl = doc.splitTextToSize(q.spek || '-', 38);
     var rh = Math.max(pl.length, sl.length) * 5 + 2;
     doc.text(pl, L + 2, y); doc.text(sl, L + 46, y);
-    doc.text(q.qty, L + 120, y, { align: 'right' }); doc.text(q.harga, L + 146, y, { align: 'right' });
+    doc.text(q.qty, L + 108, y, { align: 'right' }); doc.text(q.harga, L + 138, y, { align: 'right' });
     doc.setFont('helvetica', 'bold'); doc.text(q.total, L + 172, y, { align: 'right' });
     y += rh; doc.setDrawColor(200); doc.setLineWidth(0.3); doc.line(L, y - 3, R, y - 3); y += 7;
 
@@ -1180,44 +1186,73 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var dq = makeQuotePdf(quoteData()); if (dq) attPagesPdf(dq, attFor('brand'), 'Attachment'); return dq;
   }
 
+  // Gabungkan lampiran PDF ke dalam PDF utama (tech pack dari brand jadi halaman tambahan).
+  function mergePdf(blob, atts) {
+    var PL = window.PDFLib;
+    return blob.arrayBuffer().then(function (main) {
+      return PL.PDFDocument.load(main).then(function (out) {
+        var chain = Promise.resolve(), bad = [];
+        atts.forEach(function (a) {
+          chain = chain.then(function () {
+            return PL.PDFDocument.load(a.buf, { ignoreEncryption: true }).then(function (src) {
+              return out.copyPages(src, src.getPageIndices()).then(function (pages) { pages.forEach(function (pg) { out.addPage(pg); }); });
+            }).catch(function () { bad.push(a.name); });
+          });
+        });
+        return chain.then(function () { return out.save(); }).then(function (bytes) {
+          return { blob: new Blob([bytes], { type: 'application/pdf' }), bad: bad };
+        });
+      });
+    });
+  }
+
+  var pendingFile = null;
+  function shareFile(file, blob, name, title, msg) {
+    function fallback() {
+      try {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name; a.target = '_blank';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
+        setNote(msg + ' Kalau tidak terbuka sendiri, cek folder Unduhan atau aplikasi File.');
+      } catch (e) {
+        setNote('Unduh PDF tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.');
+      }
+    }
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: title }).then(function () { pendingFile = null; setNote(msg); }, function (err) {
+        if (err && err.name === 'AbortError') { setNote(''); return; }
+        if (err && err.name === 'NotAllowedError') {
+          // iPhone kadang menolak karena PDF selesai dibuat agak lama. Minta ketuk sekali lagi.
+          pendingFile = { file: file, blob: blob, name: name, title: title, msg: msg };
+          setNote('PDF sudah siap. Ketuk Bagikan PDF sekali lagi untuk mengirim.');
+          return;
+        }
+        fallback();
+      });
+    } else fallback();
+  }
+
   function sharePdf() {
+    if (pendingFile) { var pf = pendingFile; pendingFile = null; shareFile(pf.file, pf.blob, pf.name, pf.title, pf.msg); return; }
     var d = docData();
     var doc;
     if (state.pdfMode === 'po' && !poData()) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
     try { doc = buildDoc(); } catch (e) { doc = null; }
     if (!doc) { setNote('PDF belum bisa dibuat. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
     var blob = doc.output('blob');
-    var file, files = [];
-    try { file = new File([blob], d.file, { type: 'application/pdf' }); files.push(file); } catch (e) { file = null; }
-    attFor(state.pdfMode).forEach(function (a) {
-      if (a.kind !== 'pdf') return;
-      try { files.push(new File([a.buf], a.name, { type: 'application/pdf' })); } catch (e) {}
-    });
-    function fallback() {
-      try {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url; a.download = d.file; a.target = '_blank';
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
-        setNote('PDF dibuat. Kalau tidak terbuka sendiri, cek folder Unduhan atau aplikasi File.');
-      } catch (e) {
-        setNote('Unduh PDF tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.');
-      }
-    }
-    if (file && navigator.canShare) {
-      var use = files.length > 1 && navigator.canShare({ files: files }) ? files : (navigator.canShare({ files: [file] }) ? [file] : null);
-      if (use) {
-        navigator.share({ files: use, title: d.title }).then(function () {
-          setNote(use.length > 1 ? 'PDF dan ' + (use.length - 1) + ' lampiran PDF dibagikan.' : 'PDF dibagikan.');
-        }, function (err) {
-          if (err && err.name === 'AbortError') setNote('');
-          else fallback();
-        });
-        return;
-      }
-    }
-    fallback();
+    var pdfs = attFor(state.pdfMode).filter(function (a) { return a.kind === 'pdf'; });
+    var nImg = attFor(state.pdfMode).filter(function (a) { return a.kind === 'img'; }).length;
+    function mk(b) { try { return new File([b], d.file, { type: 'application/pdf' }); } catch (e) { return null; } }
+    var msg = 'PDF dibagikan' + (nImg + pdfs.length ? ' dengan ' + (nImg + pdfs.length) + ' lampiran.' : '.');
+    if (!pdfs.length) { shareFile(mk(blob), blob, d.file, d.title, msg); return; }
+    if (!window.PDFLib) { setNote('Lampiran PDF belum bisa digabung. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
+    setNote('Menggabungkan lampiran PDF...');
+    mergePdf(blob, pdfs).then(function (r) {
+      if (r.bad.length) msg += ' Lampiran ini tidak bisa digabung: ' + r.bad.join(', ') + '.';
+      shareFile(mk(r.blob), r.blob, d.file, d.title, msg);
+    }, function () { setNote('Gagal menggabungkan lampiran PDF. Coba hapus lalu tambahkan lagi lampirannya.'); });
   }
 
   function sheetHTML() {
@@ -1327,7 +1362,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     if (!k) return;
     if (el.tagName === 'SELECT' || el.classList.contains('txt')) state[k] = el.value;
     else state[k] = parseNum(el.value);
-    save(); render();
+    save(); render(); pendingFile = null;
   }
 
   document.addEventListener('input', onInput);
