@@ -267,6 +267,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     kirim: 'Delivery every Friday. Production lead time to be agreed after the PO is received and materials are ready.',
     ketentuan: 'Quantity tolerance +/- 3%. If an order is cancelled after the fabric has been purchased, the fabric cost is borne by the buyer. Changes in color, size, or quantity must be agreed in writing before production.',
     ttd: '', ttdImg: '',
+    vendors: [], byCutting: '', byMaking: '', byTrimming: '',
+    poVendor: '', poNomor: '', poKirim: '', poBayar: 'Pembayaran 14 hari setelah barang diterima dan dicek, transfer bank.', poCatatan: 'Barang yang cacat atau tidak sesuai spesifikasi dikembalikan untuk diperbaiki tanpa biaya tambahan.',
     qty: 15000,
     kain: 113400, hasil: 3, rol: 25, ribRol: 1, ribSel: 10000,
     cutting: 500, making: 2000, trimming: 1000,
@@ -274,14 +276,14 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     mode: 'rp', target: 5000, targetPct: 10,
     pdfMode: 'brand',
     custom: [
-      { n: 'Plastik OPP', v: 200 },
-      { n: 'Jarum, oli, listrik, lain-lain', v: 200 },
-      { n: 'Overhead', v: 700 }
+      { n: 'Plastik OPP', v: 200, by: '' },
+      { n: 'Jarum, oli, listrik, lain-lain', v: 200, by: '' },
+      { n: 'Overhead', v: 700, by: '' }
     ]
   };
 
   var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
-  var PDFMODES = [['brand', 'Surat penawaran untuk brand (tanpa biaya dan laba)'], ['internal', 'Rincian internal (dengan biaya dan laba)']];
+  var PDFMODES = [['brand', 'Surat penawaran untuk brand (tanpa biaya dan laba)'], ['internal', 'Rincian internal (dengan biaya dan laba)'], ['po', 'Purchase Order ke vendor subcon']];
 
   var scheme = null;
   var state = load();
@@ -290,7 +292,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function copyDef() {
     var s = {}, k;
     for (k in DEF) s[k] = DEF[k];
-    s.custom = DEF.custom.map(function (c) { return { n: c.n, v: c.v }; });
+    s.custom = DEF.custom.map(function (c) { return { n: c.n, v: c.v, by: c.by }; });
+    s.vendors = [];
     return s;
   }
   function load() {
@@ -303,7 +306,12 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
           if (k === 'custom') {
             if (Array.isArray(o.custom)) {
               s.custom = o.custom.filter(function (c) { return c && typeof c.n === 'string' && typeof c.v === 'number'; })
-                .map(function (c) { return { n: c.n, v: c.v }; });
+                .map(function (c) { return { n: c.n, v: c.v, by: typeof c.by === 'string' ? c.by : '' }; });
+            }
+          } else if (k === 'vendors') {
+            if (Array.isArray(o.vendors)) {
+              s.vendors = o.vendors.filter(function (v) { return v && typeof v.id === 'string'; })
+                .map(function (v) { return { id: v.id, n: String(v.n || ''), a: String(v.a || ''), t: String(v.t || '') }; });
             }
           } else if (o && o[k] !== undefined && typeof o[k] === typeof DEF[k]) s[k] = o[k];
         }
@@ -377,6 +385,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var h = '<div class="field' + (kind === 'area' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
     if (kind === 'mode') h += selectHTML(key, MODES);
     else if (kind === 'pdf') h += selectHTML(key, PDFMODES);
+    else if (kind === 'vendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '">' + vendorOptions(state[key]) + '</select>';
+    else if (kind === 'povendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '"></select>';
     else if (kind === 'area') h += '<textarea class="txt" rows="3" id="f-' + key + '" data-k="' + key + '">' + esc(state[key]) + '</textarea>';
     else if (kind === 'text') h += '<input type="text" class="txt" id="f-' + key + '" data-k="' + key + '" value="' + esc(state[key]) + '">';
     else h += '<input type="text" class="num" inputmode="decimal" autocomplete="off" id="f-' + key + '" data-k="' + key + '" value="' + fmtIn(state[key]) + '">';
@@ -386,6 +396,48 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function card(title, sub, fields, extra, id) {
     return '<div class="card"' + (id ? ' id="' + id + '"' : '') + '><h2>' + esc(title) + '</h2>' + (sub ? '<p class="sub">' + esc(sub) + '</p>' : '') +
       fields.map(fieldHTML).join('') + (extra || '') + '</div>';
+  }
+
+  function vendorById(id) {
+    for (var i = 0; i < state.vendors.length; i++) if (state.vendors[i].id === id) return state.vendors[i];
+    return null;
+  }
+  function vendorName(v, i) { return (v && v.n) || ('Vendor ' + ((i || 0) + 1)); }
+  function vendorOptions(sel) {
+    var h = '<option value=""' + (sel ? '' : ' selected') + '>Dikerjakan sendiri</option>';
+    state.vendors.forEach(function (v, i) { h += '<option value="' + esc(v.id) + '"' + (sel === v.id ? ' selected' : '') + '>Subcon: ' + esc(vendorName(v, i)) + '</option>'; });
+    return h;
+  }
+  // Semua pekerjaan per pcs beserta siapa yang mengerjakan.
+  function workItems() {
+    var w = [['Cutting', state.cutting, state.byCutting], ['Making (jahit)', state.making, state.byMaking], ['Trimming', state.trimming, state.byTrimming]];
+    state.custom.forEach(function (x) { if (x.v > 0 || x.n) w.push([x.n || 'Biaya lain', x.v, x.by || '']); });
+    return w.map(function (x) { return { l: x[0], v: x[1], by: vendorById(x[2]) ? x[2] : '' }; });
+  }
+  function refreshVendorSelects() {
+    var els = document.querySelectorAll('select.vsel');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i], k = el.getAttribute('data-k'), ci = el.getAttribute('data-ci'), cur;
+      if (k === 'poVendor') {
+        cur = state.poVendor;
+        el.innerHTML = '<option value="">Pilih vendor</option>' + state.vendors.map(function (v, j) { return '<option value="' + esc(v.id) + '"' + (cur === v.id ? ' selected' : '') + '>' + esc(vendorName(v, j)) + '</option>'; }).join('');
+      } else {
+        cur = ci !== null ? (state.custom[+ci] || {}).by : state[k];
+        el.innerHTML = vendorOptions(cur);
+      }
+    }
+  }
+  function renderVendors() {
+    var box = document.getElementById('vendor-rows');
+    if (!box) return;
+    box.innerHTML = state.vendors.map(function (v, i) {
+      return '<div class="vrow" style="border:1px solid var(--line,#ddd);border-radius:10px;padding:10px;margin-bottom:10px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>Vendor ' + (i + 1) + '</b>' +
+        '<button type="button" class="x" data-vdel="' + i + '" aria-label="Hapus vendor ' + (i + 1) + '">&times;</button></div>' +
+        '<div class="field"><label>Nama vendor</label><input type="text" class="txt" data-vi="' + i + '" data-vf="n" value="' + esc(v.n) + '"></div>' +
+        '<div class="field full"><label>Alamat</label><textarea class="txt" rows="2" data-vi="' + i + '" data-vf="a">' + esc(v.a) + '</textarea></div>' +
+        '<div class="field"><label>Telepon / WhatsApp</label><input type="text" class="txt" data-vi="' + i + '" data-vf="t" value="' + esc(v.t) + '"></div></div>';
+    }).join('') || '<p class="note">Belum ada vendor. Tambahkan kalau ada pekerjaan yang di-subcon.</p>';
   }
 
   function showTtd() {
@@ -440,13 +492,19 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       ]);
     }
     h += card('Biaya pengerjaan', 'Cutting, making, trimming. Rupiah per pcs.', [
-      ['cutting', 'Cutting'], ['making', 'Making (jahit)'], ['trimming', 'Trimming (finishing, benang)']
+      ['cutting', 'Cutting'], ['byCutting', 'Cutting dikerjakan oleh', 'vendor'],
+      ['making', 'Making (jahit)'], ['byMaking', 'Making dikerjakan oleh', 'vendor'],
+      ['trimming', 'Trimming (finishing, benang)'], ['byTrimming', 'Trimming dikerjakan oleh', 'vendor']
     ], '<div class="total"><span>Total pengerjaan</span><span id="x-kerja"></span></div>');
     h += '<div class="card" id="c-custom"><h2>Custom: biaya lain</h2>' +
       '<p class="sub">Plastik, overhead, atau biaya apa saja per pcs. Tambah atau hapus sesuai kebutuhan.</p>' +
       '<div id="custom-rows"></div>' +
       '<div class="actions" style="margin-top:6px"><button type="button" id="b-add">+ Tambah biaya</button></div>' +
       '<div class="total"><span>Total biaya lain</span><span id="x-custom"></span></div></div>';
+    h += '<div class="card" id="c-vendor"><h2>Vendor subcon</h2>' +
+      '<p class="sub">Vendor untuk pekerjaan yang tidak dikerjakan sendiri. Pilih vendornya di "dikerjakan oleh".</p>' +
+      '<div id="vendor-rows"></div>' +
+      '<div class="actions" style="margin-top:6px"><button type="button" id="b-vadd">+ Tambah vendor</button></div></div>';
     h += card('Target laba', null, [
       ['mode', 'Target laba dihitung dari', 'mode'],
       ['target', 'Target laba bersih (Rp per pcs)'],
@@ -472,11 +530,15 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     more.push(['bulat', 'Pembulatan harga jual (Rp)', null, 'Harga jual dibulatkan ke atas']);
     h += '<div class="card"><details><summary>Pengaturan tambahan</summary>' + more.map(fieldHTML).join('') + '</details></div>';
     document.getElementById('col-inputs').innerHTML = h;
-    renderCustom();
+    renderCustom(); renderVendors();
 
     document.getElementById('col-pdf').innerHTML =
       '<h2>PDF dan cetak</h2><p class="sub">Bagikan hasilnya ke brand atau simpan sebagai PDF.</p>' +
       [['pdfMode', 'Isi PDF', 'pdf']].map(fieldHTML).join('') +
+      '<div id="po-box">' + [['poVendor', 'Vendor tujuan PO', 'povendor'], ['poNomor', 'Nomor PO (kosongkan untuk otomatis)', 'text'],
+        ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
+        ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
+      '<div class="hint" id="po-info"></div></div>' +
       '<div class="actions"><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-print">Cetak</button></div>' +
       '<p class="note" id="pdf-note"></p>' +
       '<div class="actions"><button type="button" id="b-reset">Kembalikan ke contoh</button></div>';
@@ -489,7 +551,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       return '<div class="crow">' +
         '<input type="text" class="txt" data-ci="' + i + '" data-cf="n" placeholder="Nama biaya" aria-label="Nama biaya ' + (i + 1) + '" value="' + esc(c.n) + '">' +
         '<input type="text" class="num" inputmode="decimal" autocomplete="off" data-ci="' + i + '" data-cf="v" aria-label="Biaya per pcs ' + (i + 1) + '" value="' + fmtIn(c.v) + '">' +
-        '<button type="button" class="x" data-del="' + i + '" aria-label="Hapus biaya ' + (i + 1) + '">&times;</button></div>';
+        '<button type="button" class="x" data-del="' + i + '" aria-label="Hapus biaya ' + (i + 1) + '">&times;</button>' +
+        (state.vendors.length ? '<select class="vsel" style="grid-column:1/-1" data-ci="' + i + '" data-cf="by" aria-label="Dikerjakan oleh">' + vendorOptions(c.by) + '</select>' : '') + '</div>';
     }).join('') || '<p class="note">Belum ada biaya custom.</p>';
   }
 
@@ -500,8 +563,10 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function parts(c) {
     var p = [];
     if (scheme === 'FOB') { p.push(['Kain', c.kain]); p.push(['Rib', c.rib]); }
-    p.push(['Cutting', state.cutting]); p.push(['Making (jahit)', state.making]); p.push(['Trimming', state.trimming]);
-    state.custom.forEach(function (x) { if (x.v > 0 || x.n) p.push([x.n || 'Biaya lain', x.v]); });
+    workItems().forEach(function (w) {
+      var v = vendorById(w.by);
+      p.push([w.l + (v ? ' (subcon ' + vendorName(v, state.vendors.indexOf(v)) + ')' : ''), w.v]);
+    });
     if (c.reject > 0) p.push(['Cadangan reject', c.reject]);
     return p;
   }
@@ -512,6 +577,20 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function render() {
     showTtd();
     var c = calc(state, scheme);
+    var pb = document.getElementById('po-box');
+    if (pb) {
+      pb.hidden = state.pdfMode !== 'po';
+      var ps = document.getElementById('f-poVendor');
+      if (ps && ps.options && ps.options.length !== state.vendors.length + 1) refreshVendorSelects();
+      var info = document.getElementById('po-info');
+      if (info) {
+        var its = workItems().filter(function (w) { return state.poVendor && w.by === state.poVendor; });
+        info.textContent = !state.vendors.length ? 'Tambahkan vendor dulu di kartu Vendor subcon.' :
+          !state.poVendor ? 'Pilih vendor tujuan PO.' :
+          !its.length ? 'Belum ada pekerjaan yang diberikan ke vendor ini. Atur di "dikerjakan oleh".' :
+          'Isi PO: ' + its.map(function (w) { return w.l; }).join(', ') + '. Total ' + rp(its.reduce(function (a, w) { return a + w.v; }, 0) * state.qty) + '.';
+      }
+    }
     var el;
     el = document.getElementById('x-kerja'); if (el) el.textContent = rp(c.kerja);
     el = document.getElementById('x-custom'); if (el) el.textContent = rp(c.custom);
@@ -559,6 +638,17 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         { l: 'Laba total', v: rp(c.labaTotal), b: 1 },
         { l: 'Margin total', v: pct(c.margin) }
       ] });
+      state.vendors.forEach(function (v, i) {
+        var its = workItems().filter(function (w) { return w.by === v.id; });
+        if (!its.length) return;
+        var per = its.reduce(function (a, w) { return a + w.v; }, 0);
+        var rows = [{ l: vendorName(v, i), v: rp(per) + ' per pcs', b: 1 }];
+        if (v.a) rows.push({ l: 'Alamat: ' + v.a, v: '' });
+        if (v.t) rows.push({ l: 'Telp/WA: ' + v.t, v: '' });
+        rows.push({ l: 'Pekerjaan: ' + its.map(function (w) { return w.l; }).join(', '), v: '' });
+        rows.push({ l: 'Total ke vendor (' + n(state.qty) + ' pcs)', v: rp(per * state.qty) });
+        d.sections.push({ head: 'Subcon: ' + vendorName(v, i), rows: rows });
+      });
       d.note = 'Dokumen internal. Jangan dikirim ke brand.';
     } else {
       d.title = 'Quotation';
@@ -569,6 +659,11 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         { l: 'Total harga', v: rp(c.omzet), b: 1 }
       ] });
       d.note = fob ? 'Harga sudah termasuk kain, rib, dan biaya pengerjaan.' : 'Harga untuk jasa pengerjaan (cutting, making, trimming). Kain disediakan oleh brand.';
+    }
+    if (state.pdfMode === 'po') {
+      var pv = vendorById(state.poVendor);
+      d.title = 'Purchase Order';
+      d.file = 'PO-' + (pv ? vendorName(pv, state.vendors.indexOf(pv)) : 'vendor').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
     }
     var slug = ((state.brand ? state.brand + ' ' : '') + (state.nama || 'product')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'product';
     d.file = d.file + '-' + slug + '.pdf';
@@ -599,6 +694,11 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         doc.setFont('helvetica', rw.b ? 'bold' : 'normal');
         doc.setFontSize(rw.big ? 16 : 10.5);
         doc.setTextColor(0);
+        if (!rw.v) {
+          var wl = doc.splitTextToSize(String(rw.l), R - L);
+          doc.setTextColor(60); doc.text(wl, L, y); y += wl.length * 5 + 1.5;
+          return;
+        }
         doc.text(String(rw.l), L, y);
         doc.text(String(rw.v), R, y, { align: 'right' });
         y += rw.big ? 10 : 6.5;
@@ -633,6 +733,115 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         ['Delivery and production time', state.kirim], ['Other terms', state.ketentuan]].filter(function (x) { return x[1] && String(x[1]).trim(); }),
       ttd: state.ttd || state.usaha, ttdImg: state.ttdImg
     };
+  }
+
+  function poData() {
+    var v = vendorById(state.poVendor);
+    if (!v) return null;
+    var its = workItems().filter(function (w) { return w.by === v.id; });
+    if (!its.length) return null;
+    var now = new Date();
+    function pad(x) { return (x < 10 ? '0' : '') + x; }
+    var tot = 0;
+    var rows = its.map(function (w) { var t = w.v * state.qty; tot += t; return [w.l, n(state.qty) + ' pcs', rp(w.v), rp(t)]; });
+    var notes = [['Spesifikasi', state.spek], ['Batas waktu pengiriman', state.poKirim], ['Syarat pembayaran', state.poBayar], ['Catatan', state.poCatatan]]
+      .filter(function (x) { return x[1] && String(x[1]).trim(); });
+    return {
+      usaha: state.usaha, alamat: state.alamat, telp: state.telp,
+      nomor: state.poNomor || ('PO-' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + '-' + (state.vendors.indexOf(v) + 1)),
+      tanggal: now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+      vendor: vendorName(v, state.vendors.indexOf(v)), valamat: v.a, vtelp: v.t,
+      produk: state.nama || '-', rows: rows, total: rp(tot), notes: notes,
+      ttd: state.ttd || state.usaha, ttdImg: state.ttdImg
+    };
+  }
+
+  function kopPdf(doc, q, L, R) {
+    var y = 14, lh = 52 * LOGO_RATIO;
+    try { doc.addImage(LOGO, 'PNG', L, y, 52, lh); } catch (e) {}
+    var kx = 78, ky = y + 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(0);
+    doc.text(q.usaha || '', kx, ky); ky += 5.5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(60);
+    if (q.alamat) { var al = doc.splitTextToSize(q.alamat, R - kx); doc.text(al, kx, ky); ky += al.length * 4.6; }
+    if (q.telp) { doc.text('Tel/WhatsApp: ' + q.telp, kx, ky); ky += 4.6; }
+    y = Math.max(y + lh, ky) + 4;
+    doc.setDrawColor(3, 87, 166); doc.setLineWidth(1); doc.line(L, y, R, y);
+    return y + 11;
+  }
+
+  function makePoPdf(q) {
+    var J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) return null;
+    var doc = new J({ unit: 'mm', format: 'a4' });
+    var L = 18, R = 192, W = R - L, B = [3, 87, 166];
+    var y = kopPdf(doc, q, L, R);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0);
+    doc.text('PURCHASE ORDER', L, y); y += 8;
+    var meta = [['No. PO', q.nomor], ['Tanggal', q.tanggal], ['Kepada', q.vendor]];
+    if (q.valamat) meta.push(['Alamat', q.valamat]);
+    if (q.vtelp) meta.push(['Telp/WA', q.vtelp]);
+    meta.push(['Produk', q.produk]);
+    doc.setFontSize(10);
+    meta.forEach(function (m) {
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(110); doc.text(m[0], L, y);
+      doc.setTextColor(0);
+      var ls = doc.splitTextToSize(String(m[1]), W - 28); doc.text(ls, L + 28, y);
+      y += ls.length * 5 + 0.8;
+    });
+    y += 5;
+    doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255);
+    doc.text('Pekerjaan', L + 2, y); doc.text('Jumlah', L + 100, y, { align: 'right' });
+    doc.text('Harga/pcs', L + 135, y, { align: 'right' }); doc.text('Total', L + 172, y, { align: 'right' });
+    y += 8;
+    doc.setFontSize(10); doc.setTextColor(0);
+    q.rows.forEach(function (r) {
+      doc.setFont('helvetica', 'normal');
+      var pl = doc.splitTextToSize(r[0], 70);
+      doc.text(pl, L + 2, y); doc.text(r[1], L + 100, y, { align: 'right' }); doc.text(r[2], L + 135, y, { align: 'right' }); doc.text(r[3], L + 172, y, { align: 'right' });
+      y += pl.length * 5 + 1.5; doc.setDrawColor(210); doc.setLineWidth(0.3); doc.line(L, y - 3.5, R, y - 3.5); y += 2.5;
+    });
+    doc.setFont('helvetica', 'bold'); doc.text('Total', L + 135, y, { align: 'right' }); doc.text(q.total, L + 172, y, { align: 'right' });
+    y += 11;
+    q.notes.forEach(function (nt) {
+      var ls = doc.splitTextToSize(String(nt[1]), W);
+      if (y + 6 + ls.length * 4.8 > 272) { doc.addPage(); y = 22; }
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text(nt[0], L, y); y += 5;
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40); doc.text(ls, L, y); y += ls.length * 4.8 + 4;
+    });
+    if (y > 232) { doc.addPage(); y = 22; }
+    y += 6; doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Hormat kami,', L, y); doc.text('Diterima oleh,', R - 60, y);
+    if (q.ttdImg) {
+      try {
+        var tp = doc.getImageProperties(q.ttdImg), tw = 45, th = tw * tp.height / tp.width;
+        if (th > 17) { th = 17; tw = th * tp.width / tp.height; }
+        doc.addImage(q.ttdImg, 'PNG', L, y + 19 - th, tw, th);
+      } catch (e) {}
+    }
+    y += 26; doc.setDrawColor(0); doc.setLineWidth(0.3);
+    doc.line(L, y - 5, L + 55, y - 5); doc.line(R - 60, y - 5, R, y - 5);
+    doc.setFont('helvetica', 'bold'); doc.text(q.ttd || '', L, y);
+    doc.setFont('helvetica', 'normal'); doc.text(q.vendor, R - 60, y);
+    return doc;
+  }
+
+  function poHTML(q) {
+    function br(t) { return esc(t || '').replace(/\n/g, '<br>'); }
+    var h = '<div class="kop"><img src="' + LOGO + '" alt=""><div class="a"><b>' + esc(q.usaha || '') + '</b>' +
+      (q.alamat ? '<br>' + br(q.alamat) : '') + (q.telp ? '<br>Tel/WhatsApp: ' + esc(q.telp) : '') + '</div></div>';
+    h += '<h1>PURCHASE ORDER</h1>';
+    h += '<div class="m"><b>No. PO</b>' + esc(q.nomor) + '</div><div class="m"><b>Tanggal</b>' + esc(q.tanggal) + '</div><div class="m"><b>Kepada</b>' + esc(q.vendor) + '</div>';
+    if (q.valamat) h += '<div class="m"><b>Alamat</b>' + br(q.valamat) + '</div>';
+    if (q.vtelp) h += '<div class="m"><b>Telp/WA</b>' + esc(q.vtelp) + '</div>';
+    h += '<div class="m"><b>Produk</b>' + esc(q.produk) + '</div>';
+    h += '<table class="q"><thead><tr><th>Pekerjaan</th><th style="text-align:right">Jumlah</th><th style="text-align:right">Harga/pcs</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    q.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td style="text-align:right">' + esc(r[1]) + '</td><td style="text-align:right">' + esc(r[2]) + '</td><td style="text-align:right">' + esc(r[3]) + '</td></tr>'; });
+    h += '<tr><td></td><td></td><td style="text-align:right"><b>Total</b></td><td style="text-align:right"><b>' + esc(q.total) + '</b></td></tr></tbody></table>';
+    q.notes.forEach(function (nt) { h += '<div class="nt"><b>' + esc(nt[0]) + '</b>' + br(nt[1]) + '</div>'; });
+    h += '<div class="ttd"><div>Hormat kami,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:180px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div>Diterima oleh,<div class="sp"></div>' + esc(q.vendor) + '</div></div>';
+    return h;
   }
 
   function makeQuotePdf(q) {
@@ -725,7 +934,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function sharePdf() {
     var d = docData();
     var doc;
-    try { doc = state.pdfMode === 'internal' ? makePdf(d) : makeQuotePdf(quoteData()); } catch (e) { doc = null; }
+    if (state.pdfMode === 'po' && !poData()) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
+    try { doc = state.pdfMode === 'internal' ? makePdf(d) : state.pdfMode === 'po' ? makePoPdf(poData()) : makeQuotePdf(quoteData()); } catch (e) { doc = null; }
     if (!doc) { setNote('PDF belum bisa dibuat. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
     var blob = doc.output('blob');
     var file;
@@ -753,6 +963,13 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function printSheet() {
     var d = docData();
     var h;
+    if (state.pdfMode === 'po') {
+      var pq = poData();
+      if (!pq) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
+      document.getElementById('sheet').innerHTML = poHTML(pq);
+      try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
+      return;
+    }
     if (state.pdfMode !== 'internal') {
       document.getElementById('sheet').innerHTML = quoteHTML(quoteData());
       try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
@@ -799,10 +1016,19 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var el = e.target;
     if (!el || !el.getAttribute) return;
     if (el.id === 'f-ttdfile') { if (e.type === 'change') { loadTtd(el.files && el.files[0]); el.value = ''; } return; }
+    var vi = el.getAttribute('data-vi');
+    if (vi !== null) {
+      var vd = state.vendors[+vi];
+      if (!vd) return;
+      vd[el.getAttribute('data-vf')] = el.value;
+      save(); refreshVendorSelects(); render();
+      return;
+    }
     var ci = el.getAttribute('data-ci');
     if (ci !== null) {
       var item = state.custom[+ci];
       if (!item) return;
+      if (el.getAttribute('data-cf') === 'by') { item.by = el.value; save(); render(); return; }
       if (el.getAttribute('data-cf') === 'n') item.n = el.value;
       else item.v = parseNum(el.value);
       save(); render();
@@ -833,6 +1059,16 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     if (!t || !t.closest) return;
     var ch = t.closest('[data-scheme]');
     if (ch) { enter(ch.getAttribute('data-scheme')); return; }
+    var vdel = t.closest('[data-vdel]');
+    if (vdel) {
+      var gone = state.vendors.splice(+vdel.getAttribute('data-vdel'), 1)[0];
+      if (gone) {
+        ['byCutting', 'byMaking', 'byTrimming', 'poVendor'].forEach(function (k) { if (state[k] === gone.id) state[k] = ''; });
+        state.custom.forEach(function (c) { if (c.by === gone.id) c.by = ''; });
+      }
+      save(); renderVendors(); renderCustom(); refreshVendorSelects(); render();
+      return;
+    }
     var del = t.closest('[data-del]');
     if (del) {
       state.custom.splice(+del.getAttribute('data-del'), 1);
@@ -841,8 +1077,14 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     }
     var id = t.id;
     if (id === 'b-back') home();
+    else if (id === 'b-vadd') {
+      state.vendors.push({ id: 'v' + Date.now().toString(36), n: '', a: '', t: '' });
+      save(); renderVendors(); renderCustom(); refreshVendorSelects(); render();
+      var vr = document.querySelectorAll('#vendor-rows input[data-vf="n"]');
+      if (vr.length) vr[vr.length - 1].focus();
+    }
     else if (id === 'b-add') {
-      state.custom.push({ n: '', v: 0 });
+      state.custom.push({ n: '', v: 0, by: '' });
       save(); renderCustom(); render();
       var rows = document.querySelectorAll('#custom-rows .crow input.txt');
       if (rows.length) rows[rows.length - 1].focus();
@@ -852,8 +1094,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     else if (id === 'b-share') sharePdf();
     else if (id === 'b-print') printSheet();
     else if (id === 'b-reset') {
-      var keepTtd = state.ttdImg;
-      state = copyDef(); state.ttdImg = keepTtd;
+      var keepTtd = state.ttdImg, keepV = state.vendors;
+      state = copyDef(); state.ttdImg = keepTtd; state.vendors = keepV;
       save(); buildInputs(); render();
       setNote('Isian dikembalikan ke contoh kaos polos 24s.');
     }
