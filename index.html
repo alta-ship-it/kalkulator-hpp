@@ -1044,14 +1044,23 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   document.addEventListener('input', onInput);
   document.addEventListener('change', onInput);
 
-  // Saat kotak disentuh, isi lama langsung terpilih supaya ketikan baru menggantikannya.
+  // Saat kotak disentuh, isi lama dikosongkan supaya bisa langsung mengetik.
+  // Isi lama tampil samar sebagai contoh. Kalau keluar tanpa mengetik, isi lama kembali.
   document.addEventListener('focusin', function (e) {
     var el = e.target;
-    if (el && el.tagName === 'INPUT' && (el.classList.contains('num') || el.classList.contains('txt'))) {
-      setTimeout(function () {
-        try { el.select(); el.setSelectionRange(0, el.value.length); } catch (err) {}
-      }, 0);
-    }
+    if (!el || !(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    if (el.type === 'file' || !(el.classList.contains('num') || el.classList.contains('txt'))) return;
+    if (el.value === '') return;
+    el._old = el.value; el._oldPh = el.placeholder; el._typed = false;
+    el.placeholder = el.value; el.value = '';
+  });
+  document.addEventListener('input', function (e) { if (e.target) e.target._typed = true; }, true);
+  document.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (!el || el._old === undefined) return;
+    if (!el._typed && el.value === '') el.value = el._old;
+    el.placeholder = el._oldPh || '';
+    el._old = undefined;
   });
 
   document.addEventListener('click', function (e) {
