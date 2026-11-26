@@ -182,7 +182,18 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   #sheet .ttd { display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; }
   #sheet .ttd div { width: 45%; }
   #sheet .ttd .sp { height: 60px; }
+  #sheet .att { page-break-before: always; break-before: page; }
+  #sheet .att h3 { font-size: 13px; margin: 0 0 8px; }
+  #sheet .att img { max-width: 100%; max-height: 240mm; }
+  #sheet table.sum { margin-left: auto; width: 55%; font-size: 12px; margin-top: 6px; }
+  #sheet table.sum td { border: 0; padding: 3px 6px; }
 }
+.attrow { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line, #e3e3e3); }
+.attrow img, .attrow .pdf { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line, #ddd); flex: none; }
+.attrow .pdf { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #b3261e; background: #fff; }
+.attrow .nm { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 6px 0; }
+.chk input { width: 20px; height: 20px; }
 @media (max-width: 440px) {
   .field { grid-template-columns: minmax(0, 1fr) 120px; }
   .crow { grid-template-columns: minmax(0, 1fr) 96px 38px; }
@@ -267,6 +278,9 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     kirim: 'Delivery every Friday. Production lead time to be agreed after the PO is received and materials are ready.',
     ketentuan: 'Quantity tolerance +/- 3%. If an order is cancelled after the fabric has been purchased, the fabric cost is borne by the buyer. Changes in color, size, or quantity must be agreed in writing before production.',
     ttd: '', ttdImg: '',
+    invNo: '', invPoRef: '', invQty: 0, invTempo: 14, invPajak: 0, invDP: 0,
+    bank: '', rek: '', atasNama: '', invCatatan: 'Please include the invoice number in your transfer description.',
+    attQuote: true, attPo: true,
     vendors: [], byCutting: '', byMaking: '', byTrimming: '',
     poVendor: '', poNomor: '', poKirim: '', poBayar: 'Pembayaran 14 hari setelah barang diterima dan dicek, transfer bank.', poCatatan: 'Barang yang cacat atau tidak sesuai spesifikasi dikembalikan untuk diperbaiki tanpa biaya tambahan.',
     qty: 15000,
@@ -283,10 +297,11 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   };
 
   var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
-  var PDFMODES = [['brand', 'Surat penawaran untuk brand (tanpa biaya dan laba)'], ['internal', 'Rincian internal (dengan biaya dan laba)'], ['po', 'Purchase Order ke vendor subcon']];
+  var PDFMODES = [['brand', 'Quotation untuk brand (tanpa biaya dan laba)'], ['invoice', 'Invoice untuk brand'], ['po', 'Purchase Order ke vendor subcon'], ['internal', 'Rincian internal (dengan biaya dan laba)']];
 
   var scheme = null;
   var state = load();
+  loadAtt();
   document.getElementById('logo').src = LOGO;
 
   function copyDef() {
@@ -385,6 +400,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var h = '<div class="field' + (kind === 'area' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
     if (kind === 'mode') h += selectHTML(key, MODES);
     else if (kind === 'pdf') h += selectHTML(key, PDFMODES);
+    else if (kind === 'check') return '<label class="chk"><input type="checkbox" id="f-' + key + '" data-k="' + key + '"' + (state[key] ? ' checked' : '') + '> ' + esc(label) + '</label>';
     else if (kind === 'vendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '">' + vendorOptions(state[key]) + '</select>';
     else if (kind === 'povendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '"></select>';
     else if (kind === 'area') h += '<textarea class="txt" rows="3" id="f-' + key + '" data-k="' + key + '">' + esc(state[key]) + '</textarea>';
@@ -505,6 +521,13 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       '<p class="sub">Vendor untuk pekerjaan yang tidak dikerjakan sendiri. Pilih vendornya di "dikerjakan oleh".</p>' +
       '<div id="vendor-rows"></div>' +
       '<div class="actions" style="margin-top:6px"><button type="button" id="b-vadd">+ Tambah vendor</button></div></div>';
+    h += '<div class="card" id="c-att"><h2>Lampiran: tech pack dan desain</h2>' +
+      '<p class="sub">Foto atau PDF dari brand. Foto dimasukkan sebagai halaman tambahan di PDF. File PDF ikut dikirim bersama saat Bagikan PDF.</p>' +
+      '<div id="att-rows"></div>' +
+      '<input type="file" id="f-attfile" accept="image/*,application/pdf" multiple hidden>' +
+      '<div class="actions" style="margin-top:6px"><button type="button" id="b-att">+ Tambah lampiran</button></div>' +
+      fieldHTML(['attQuote', 'Lampirkan ke Quotation', 'check']) + fieldHTML(['attPo', 'Lampirkan ke PO subcon', 'check']) +
+      '<div class="hint">Lampiran hanya disimpan di HP ini. Hapus lampiran order lama sebelum order baru.</div></div>';
     h += card('Target laba', null, [
       ['mode', 'Target laba dihitung dari', 'mode'],
       ['target', 'Target laba bersih (Rp per pcs)'],
@@ -530,11 +553,17 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     more.push(['bulat', 'Pembulatan harga jual (Rp)', null, 'Harga jual dibulatkan ke atas']);
     h += '<div class="card"><details><summary>Pengaturan tambahan</summary>' + more.map(fieldHTML).join('') + '</details></div>';
     document.getElementById('col-inputs').innerHTML = h;
-    renderCustom(); renderVendors();
+    renderCustom(); renderVendors(); renderAtt();
 
     document.getElementById('col-pdf').innerHTML =
       '<h2>PDF dan cetak</h2><p class="sub">Bagikan hasilnya ke brand atau simpan sebagai PDF.</p>' +
       [['pdfMode', 'Isi PDF', 'pdf']].map(fieldHTML).join('') +
+      '<div id="inv-box">' + [['invNo', 'Nomor invoice (kosongkan untuk otomatis)', 'text'], ['invPoRef', 'Nomor PO dari brand (opsional)', 'text'],
+        ['invQty', 'Jumlah yang ditagih (pcs)', null, 'Isi 0 untuk seluruh order. Untuk tagihan per pengiriman, isi jumlah yang dikirim.'],
+        ['invTempo', 'Jatuh tempo (hari setelah invoice)'], ['invPajak', 'Pajak / PPN (%)', null, 'Isi 0 kalau tidak memungut PPN.'],
+        ['invDP', 'Dikurangi DP yang sudah dibayar (Rp)'],
+        ['bank', 'Nama bank', 'text'], ['rek', 'Nomor rekening', 'text'], ['atasNama', 'Atas nama rekening', 'text'],
+        ['invCatatan', 'Catatan di invoice', 'area']].map(fieldHTML).join('') + '</div>' +
       '<div id="po-box">' + [['poVendor', 'Vendor tujuan PO', 'povendor'], ['poNomor', 'Nomor PO (kosongkan untuk otomatis)', 'text'],
         ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
         ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
@@ -577,6 +606,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function render() {
     showTtd();
     var c = calc(state, scheme);
+    var ib = document.getElementById('inv-box'); if (ib) ib.hidden = state.pdfMode !== 'invoice';
     var pb = document.getElementById('po-box');
     if (pb) {
       pb.hidden = state.pdfMode !== 'po';
@@ -660,6 +690,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       ] });
       d.note = fob ? 'Harga sudah termasuk kain, rib, dan biaya pengerjaan.' : 'Harga untuk jasa pengerjaan (cutting, making, trimming). Kain disediakan oleh brand.';
     }
+    if (state.pdfMode === 'invoice') { d.title = 'Invoice'; d.file = 'Invoice-' + (state.invNo ? state.invNo.replace(/[^A-Za-z0-9]+/g, '-') : scheme); }
     if (state.pdfMode === 'po') {
       var pv = vendorById(state.poVendor);
       d.title = 'Purchase Order';
@@ -733,6 +764,179 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         ['Delivery and production time', state.kirim], ['Other terms', state.ketentuan]].filter(function (x) { return x[1] && String(x[1]).trim(); }),
       ttd: state.ttd || state.usaha, ttdImg: state.ttdImg
     };
+  }
+
+  /* ---------- Lampiran (disimpan di IndexedDB HP) ---------- */
+  var ATT = [];
+  function idb(cb) {
+    try {
+      var r = indexedDB.open('pandera-lampiran', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('files', { keyPath: 'id' }); };
+      r.onsuccess = function () { cb(r.result); };
+      r.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  }
+  function loadAtt() {
+    idb(function (db) {
+      if (!db) return;
+      var q = db.transaction('files').objectStore('files').getAll();
+      q.onsuccess = function () { ATT = (q.result || []).sort(function (a, b) { return a.id < b.id ? -1 : 1; }); renderAtt(); };
+    });
+  }
+  function putAtt(rec) {
+    ATT.push(rec); renderAtt();
+    idb(function (db) { if (db) db.transaction('files', 'readwrite').objectStore('files').put(rec); });
+  }
+  function delAtt(id) {
+    ATT = ATT.filter(function (a) { return a.id !== id; }); renderAtt();
+    idb(function (db) { if (db) db.transaction('files', 'readwrite').objectStore('files').delete(id); });
+  }
+  function renderAtt() {
+    var box = document.getElementById('att-rows');
+    if (!box) return;
+    box.innerHTML = ATT.map(function (a) {
+      return '<div class="attrow">' + (a.kind === 'img' ? '<img src="' + a.data + '" alt="">' : '<div class="pdf">PDF</div>') +
+        '<div class="nm">' + esc(a.name) + '</div><button type="button" class="x" data-adel="' + esc(a.id) + '" aria-label="Hapus lampiran">&times;</button></div>';
+    }).join('') || '<p class="note">Belum ada lampiran.</p>';
+  }
+  function addAttFiles(list) {
+    Array.prototype.forEach.call(list || [], function (f, k) {
+      var id = 'a' + Date.now().toString(36) + k;
+      if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+        var fr = new FileReader();
+        fr.onload = function () { putAtt({ id: id, kind: 'pdf', name: f.name, buf: fr.result }); };
+        fr.readAsArrayBuffer(f);
+        return;
+      }
+      var r = new FileReader();
+      r.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var s = Math.min(1, 1600 / Math.max(img.width, img.height));
+          var cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+          var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+          putAtt({ id: id, kind: 'img', name: f.name || 'Gambar', data: cv.toDataURL('image/jpeg', 0.82), w: cv.width, h: cv.height });
+        };
+        img.onerror = function () { setNote('Gambar ' + f.name + ' tidak bisa dibaca.'); };
+        img.src = r.result;
+      };
+      r.readAsDataURL(f);
+    });
+  }
+  function attFor(mode) {
+    if (mode === 'brand' && state.attQuote) return ATT;
+    if (mode === 'po' && state.attPo) return ATT;
+    return [];
+  }
+  function attPagesPdf(doc, list, label) {
+    var imgs = list.filter(function (a) { return a.kind === 'img'; });
+    imgs.forEach(function (a, i) {
+      doc.addPage();
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0);
+      doc.text(label + ' ' + (i + 1) + ': ' + a.name, 18, 18);
+      var mw = 174, mh = 250, w = mw, hh = w * a.h / a.w;
+      if (hh > mh) { hh = mh; w = hh * a.w / a.h; }
+      try { doc.addImage(a.data, 'JPEG', 18 + (mw - w) / 2, 24, w, hh); } catch (e) {}
+    });
+  }
+  function attPagesHTML(list, label) {
+    return list.filter(function (a) { return a.kind === 'img'; }).map(function (a, i) {
+      return '<div class="att"><h3>' + esc(label + ' ' + (i + 1) + ': ' + a.name) + '</h3><img src="' + a.data + '" alt=""></div>';
+    }).join('');
+  }
+
+  /* ---------- Invoice ---------- */
+  function invData() {
+    var c = calc(state, scheme), now = new Date();
+    function en(x) { return isFinite(x) ? Math.round(x).toLocaleString('en-US') : '-'; }
+    function dt(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
+    function pad(x) { return (x < 10 ? '0' : '') + x; }
+    var qty = state.invQty > 0 ? state.invQty : state.qty;
+    var sub = c.harga * qty, tax = sub * (state.invPajak || 0) / 100, dp = state.invDP || 0, due = sub + tax - dp;
+    var sums = [['Subtotal', 'Rp ' + en(sub)]];
+    if (tax > 0) sums.push(['VAT ' + fmtIn(state.invPajak) + '%', 'Rp ' + en(tax)]);
+    if (dp > 0) sums.push(['Less: down payment', '- Rp ' + en(dp)]);
+    sums.push(['Total due', 'Rp ' + en(due)]);
+    var meta = [['Invoice No.', state.invNo || ('INV-' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()))], ['Date', dt(now)],
+      ['Due date', dt(new Date(now.getTime() + (state.invTempo || 0) * 86400000))],
+      ['Bill to', (state.brand || '-') + (state.up ? ' (Attn: ' + state.up + ')' : '')]];
+    if (state.invPoRef) meta.push(['Customer PO', state.invPoRef]);
+    var pay = [];
+    if (state.bank) pay.push(['Bank', state.bank]);
+    if (state.rek) pay.push(['Account no.', state.rek]);
+    if (state.atasNama) pay.push(['Account name', state.atasNama]);
+    return {
+      usaha: state.usaha, alamat: state.alamat, telp: state.telp, meta: meta,
+      row: [(state.nama || 'Product') + (state.spek ? ' (' + state.spek + ')' : ''), en(qty) + ' pcs', 'Rp ' + en(c.harga), 'Rp ' + en(sub)],
+      sums: sums, pay: pay, note: state.invCatatan, ttd: state.ttd || state.usaha, ttdImg: state.ttdImg
+    };
+  }
+  function makeInvPdf(q) {
+    var J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) return null;
+    var doc = new J({ unit: 'mm', format: 'a4' });
+    var L = 18, R = 192, W = R - L, B = [3, 87, 166];
+    var y = kopPdf(doc, q, L, R);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0);
+    doc.text('INVOICE', L, y); y += 8;
+    doc.setFontSize(10);
+    q.meta.forEach(function (m) {
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(110); doc.text(m[0], L, y);
+      doc.setTextColor(0); var ls = doc.splitTextToSize(String(m[1]), W - 30); doc.text(ls, L + 30, y); y += ls.length * 5 + 0.8;
+    });
+    y += 5;
+    doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255);
+    doc.text('Description', L + 2, y); doc.text('Quantity', L + 110, y, { align: 'right' });
+    doc.text('Unit price', L + 140, y, { align: 'right' }); doc.text('Amount', L + 172, y, { align: 'right' });
+    y += 8; doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0);
+    var dl = doc.splitTextToSize(q.row[0], 80);
+    doc.text(dl, L + 2, y); doc.text(q.row[1], L + 110, y, { align: 'right' }); doc.text(q.row[2], L + 140, y, { align: 'right' }); doc.text(q.row[3], L + 172, y, { align: 'right' });
+    y += dl.length * 5 + 1; doc.setDrawColor(200); doc.setLineWidth(0.3); doc.line(L, y - 2, R, y - 2); y += 5;
+    q.sums.forEach(function (s, i) {
+      var last = i === q.sums.length - 1;
+      doc.setFont('helvetica', last ? 'bold' : 'normal'); doc.setFontSize(last ? 11.5 : 10);
+      doc.text(s[0], L + 120, y, { align: 'right' }); doc.text(s[1], L + 172, y, { align: 'right' }); y += last ? 7 : 5.5;
+    });
+    y += 6;
+    if (q.pay.length) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text('Payment details', L, y); y += 5;
+      doc.setFont('helvetica', 'normal');
+      q.pay.forEach(function (pp) { doc.setTextColor(110); doc.text(pp[0], L, y); doc.setTextColor(0); doc.text(pp[1], L + 30, y); y += 5; });
+      y += 3;
+    }
+    if (q.note) {
+      var nl = doc.splitTextToSize(q.note, W);
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('Notes', L, y); y += 5;
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40); doc.text(nl, L, y); y += nl.length * 4.8 + 4;
+    }
+    if (y > 240) { doc.addPage(); y = 22; }
+    y += 6; doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Sincerely,', L, y);
+    if (q.ttdImg) {
+      try {
+        var tp = doc.getImageProperties(q.ttdImg), tw = 45, th = tw * tp.height / tp.width;
+        if (th > 17) { th = 17; tw = th * tp.width / tp.height; }
+        doc.addImage(q.ttdImg, 'PNG', L, y + 19 - th, tw, th);
+      } catch (e) {}
+    }
+    y += 26; doc.setDrawColor(0); doc.line(L, y - 5, L + 55, y - 5);
+    doc.setFont('helvetica', 'bold'); doc.text(q.ttd || '', L, y);
+    return doc;
+  }
+  function invHTML(q) {
+    function br(t) { return esc(t || '').replace(/\n/g, '<br>'); }
+    var h = '<div class="kop"><img src="' + LOGO + '" alt=""><div class="a"><b>' + esc(q.usaha || '') + '</b>' +
+      (q.alamat ? '<br>' + br(q.alamat) : '') + (q.telp ? '<br>Tel/WhatsApp: ' + esc(q.telp) : '') + '</div></div>';
+    h += '<h1>INVOICE</h1>';
+    q.meta.forEach(function (m) { h += '<div class="m"><b>' + esc(m[0]) + '</b>' + esc(m[1]) + '</div>'; });
+    h += '<table class="q"><thead><tr><th>Description</th><th style="text-align:right">Quantity</th><th style="text-align:right">Unit price</th><th style="text-align:right">Amount</th></tr></thead><tbody><tr>' +
+      q.row.map(function (x, i) { return '<td' + (i ? ' style="text-align:right"' : '') + '>' + esc(x) + '</td>'; }).join('') + '</tr></tbody></table>';
+    h += '<table class="sum">' + q.sums.map(function (s, i) { var b = i === q.sums.length - 1; return '<tr><td style="text-align:right' + (b ? ';font-weight:700' : '') + '">' + esc(s[0]) + '</td><td style="text-align:right' + (b ? ';font-weight:700' : '') + '">' + esc(s[1]) + '</td></tr>'; }).join('') + '</table>';
+    if (q.pay.length) h += '<div class="nt"><b>Payment details</b>' + q.pay.map(function (pp) { return esc(pp[0]) + ': ' + esc(pp[1]); }).join('<br>') + '</div>';
+    if (q.note) h += '<div class="nt"><b>Notes</b>' + br(q.note) + '</div>';
+    h += '<div class="ttd"><div>Sincerely,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:180px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div></div></div>';
+    return h;
   }
 
   function poData() {
@@ -931,15 +1135,27 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
 
   function setNote(t) { var el = document.getElementById('pdf-note'); if (el) el.textContent = t; }
 
+  function buildDoc() {
+    var m = state.pdfMode;
+    if (m === 'internal') return makePdf(docData());
+    if (m === 'po') { var doc = makePoPdf(poData()); if (doc) attPagesPdf(doc, attFor('po'), 'Lampiran'); return doc; }
+    if (m === 'invoice') return makeInvPdf(invData());
+    var dq = makeQuotePdf(quoteData()); if (dq) attPagesPdf(dq, attFor('brand'), 'Attachment'); return dq;
+  }
+
   function sharePdf() {
     var d = docData();
     var doc;
     if (state.pdfMode === 'po' && !poData()) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
-    try { doc = state.pdfMode === 'internal' ? makePdf(d) : state.pdfMode === 'po' ? makePoPdf(poData()) : makeQuotePdf(quoteData()); } catch (e) { doc = null; }
+    try { doc = buildDoc(); } catch (e) { doc = null; }
     if (!doc) { setNote('PDF belum bisa dibuat. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
     var blob = doc.output('blob');
-    var file;
-    try { file = new File([blob], d.file, { type: 'application/pdf' }); } catch (e) { file = null; }
+    var file, files = [];
+    try { file = new File([blob], d.file, { type: 'application/pdf' }); files.push(file); } catch (e) { file = null; }
+    attFor(state.pdfMode).forEach(function (a) {
+      if (a.kind !== 'pdf') return;
+      try { files.push(new File([a.buf], a.name, { type: 'application/pdf' })); } catch (e) {}
+    });
     function fallback() {
       try {
         var url = URL.createObjectURL(blob);
@@ -952,31 +1168,37 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         setNote('Unduh PDF tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.');
       }
     }
-    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: d.title }).then(function () { setNote('PDF dibagikan.'); }, function (err) {
-        if (err && err.name === 'AbortError') setNote('');
-        else fallback();
-      });
-    } else fallback();
+    if (file && navigator.canShare) {
+      var use = files.length > 1 && navigator.canShare({ files: files }) ? files : (navigator.canShare({ files: [file] }) ? [file] : null);
+      if (use) {
+        navigator.share({ files: use, title: d.title }).then(function () {
+          setNote(use.length > 1 ? 'PDF dan ' + (use.length - 1) + ' lampiran PDF dibagikan.' : 'PDF dibagikan.');
+        }, function (err) {
+          if (err && err.name === 'AbortError') setNote('');
+          else fallback();
+        });
+        return;
+      }
+    }
+    fallback();
   }
 
   function printSheet() {
     var d = docData();
-    var h;
-    if (state.pdfMode === 'po') {
+    var h, m = state.pdfMode;
+    function go(html) {
+      document.getElementById('sheet').innerHTML = html;
+      try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
+    }
+    if (m === 'po') {
       var pq = poData();
       if (!pq) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
-      document.getElementById('sheet').innerHTML = poHTML(pq);
-      try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
-      return;
+      return go(poHTML(pq) + attPagesHTML(attFor('po'), 'Lampiran'));
     }
-    if (state.pdfMode !== 'internal') {
-      document.getElementById('sheet').innerHTML = quoteHTML(quoteData());
-      try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
-      return;
-    }
+    if (m === 'invoice') return go(invHTML(invData()));
+    if (m !== 'internal') return go(quoteHTML(quoteData()) + attPagesHTML(attFor('brand'), 'Attachment'));
     h = '<h1>' + esc(d.title) + '</h1>';
-    d.meta.forEach(function (m) { h += '<div class="m"><b>' + esc(m[0]) + '</b>' + esc(m[1]) + '</div>'; });
+    d.meta.forEach(function (mm) { h += '<div class="m"><b>' + esc(mm[0]) + '</b>' + esc(mm[1]) + '</div>'; });
     d.sections.forEach(function (s) {
       h += '<h2>' + esc(s.head) + '</h2><table>';
       s.rows.forEach(function (r) {
@@ -986,8 +1208,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     });
     if (d.note) h += '<div class="n">' + esc(d.note) + '</div>';
     h += '<div class="f">Dibuat dengan Kalkulator Harga Konveksi</div>';
-    document.getElementById('sheet').innerHTML = h;
-    try { window.print(); setNote(''); } catch (e) { setNote('Cetak tidak didukung di sini. Buka kalkulator lewat link aplikasinya, lalu coba lagi.'); }
+    go(h);
   }
 
   /* ---------- Layar ---------- */
@@ -1015,6 +1236,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function onInput(e) {
     var el = e.target;
     if (!el || !el.getAttribute) return;
+    if (el.id === 'f-attfile') { if (e.type === 'change') { addAttFiles(el.files); el.value = ''; } return; }
+    if (el.type === 'checkbox' && el.getAttribute('data-k')) { state[el.getAttribute('data-k')] = el.checked; save(); return; }
     if (el.id === 'f-ttdfile') { if (e.type === 'change') { loadTtd(el.files && el.files[0]); el.value = ''; } return; }
     var vi = el.getAttribute('data-vi');
     if (vi !== null) {
@@ -1068,6 +1291,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     if (!t || !t.closest) return;
     var ch = t.closest('[data-scheme]');
     if (ch) { enter(ch.getAttribute('data-scheme')); return; }
+    var adel = t.closest('[data-adel]');
+    if (adel) { delAtt(adel.getAttribute('data-adel')); return; }
     var vdel = t.closest('[data-vdel]');
     if (vdel) {
       var gone = state.vendors.splice(+vdel.getAttribute('data-vdel'), 1)[0];
@@ -1086,6 +1311,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     }
     var id = t.id;
     if (id === 'b-back') home();
+    else if (id === 'b-att') document.getElementById('f-attfile').click();
     else if (id === 'b-vadd') {
       state.vendors.push({ id: 'v' + Date.now().toString(36), n: '', a: '', t: '' });
       save(); renderVendors(); renderCustom(); refreshVendorSelects(); render();
