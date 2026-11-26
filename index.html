@@ -169,6 +169,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
 .paper { width: 794px; min-height: 1123px; box-sizing: border-box; padding: 56px 60px; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; transform-origin: top left; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
 .paper h1 { font-size: 22px; margin: 0 0 10px; }
 .paper table { width: 100%; border-collapse: collapse; }
+.paper .ttd3 div { width: 30%; }
 .paper .att { margin-top: 40px; padding-top: 30px; border-top: 2px dashed #bbb; }
   .paper h1 { font-family: Arial, Helvetica, sans-serif; font-size: 22px; margin: 0 0 10px; }
   .paper .m { font-size: 12px; margin: 2px 0; }
@@ -218,6 +219,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   #sheet .nt b { display: block; }
   #sheet .ttd { display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; }
   #sheet .ttd div { width: 45%; }
+  #sheet .ttd3 div { width: 30%; }
   #sheet .ttd .sp { height: 60px; }
   #sheet .att { page-break-before: always; break-before: page; }
   #sheet .pdfnote { display: none; }
@@ -230,6 +232,21 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
 .attrow img, .attrow .pdf { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line, #ddd); flex: none; }
 .attrow .pdf { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #b3261e; background: #fff; }
 .attrow .nm { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orow { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.orow .oopen { flex: 1; text-align: left; font-weight: 400; line-height: 1.45; padding: 10px 12px; }
+.orow.cur .oopen { border-color: var(--accent, #0f6b63); border-width: 2px; }
+.orow small { color: var(--muted); }
+.badge.sm { font-size: 11px; padding: 1px 6px; }
+.grow { border: 1px solid var(--line, #ddd); border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+.ghead { display: flex; gap: 8px; margin-bottom: 6px; }
+.ghead input { flex: 1; }
+.gcells { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; }
+.gcells label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
+.gcells input { width: 100%; box-sizing: border-box; }
+.gsum { font-size: 13px; color: var(--muted); margin-top: 6px; }
+details.dlv { border: 1px solid var(--line, #ddd); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+details.dlv summary { cursor: pointer; padding: 4px 0; }
+button.danger { color: var(--bad, #b3261e); }
 .chk { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 6px 0; }
 .chk input { width: 20px; height: 20px; }
 @media (max-width: 440px) {
@@ -257,12 +274,15 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
         <div class="desc">Hanya biaya pengerjaan: cutting, making, trimming, dan biaya custom.</div>
       </button>
     </div>
-    <p class="note">Isian tersimpan di browser ini saja.</p>
+    <h2 style="margin-top:28px">Order tersimpan</h2>
+    <p class="note">Ketuk FOB atau CMT di atas untuk order baru. Ketuk order di bawah untuk melanjutkan.</p>
+    <div id="order-list"></div>
+    <p class="note">Semua data tersimpan di HP ini saja.</p>
   </div>
 
   <div id="v-calc" hidden>
     <div class="topbar">
-      <button type="button" id="b-back">&larr; Ganti skema</button>
+      <button type="button" id="b-back">&larr; Daftar order</button>
       <span class="badge" id="badge"></span>
     </div>
     <h1 id="calc-title"></h1>
@@ -320,6 +340,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     invNo: '', invPoRef: '', invQty: 0, invTempo: 14, invPajak: 0, invDP: 0,
     bank: '', rek: '', atasNama: '', invCatatan: 'Please include the invoice number in your transfer description.',
     attQuote: true, attPo: true,
+    orderId: '', scheme: '', brandAlamat: '', sizes: 'S, M, L, XL, XXL', grid: [], dlv: [], sjSel: '', invDlv: '', poNos: {},
+    seq: { QT: 0, INV: 0, PO: 0, SJ: 0 },
     vendors: [], byCutting: '', byMaking: '', byTrimming: '',
     poVendor: '', poNomor: '', poKirim: '', poBayar: 'Pembayaran 14 hari setelah barang diterima dan dicek, transfer bank.', poCatatan: 'Barang yang cacat atau tidak sesuai spesifikasi dikembalikan untuk diperbaiki tanpa biaya tambahan.',
     qty: 15000,
@@ -336,18 +358,17 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   };
 
   var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
-  var PDFMODES = [['brand', 'Quotation untuk brand (tanpa biaya dan laba)'], ['invoice', 'Invoice untuk brand'], ['po', 'Purchase Order ke vendor subcon'], ['internal', 'Rincian internal (dengan biaya dan laba)']];
+  var PDFMODES = [['brand', 'Quotation untuk brand (tanpa biaya dan laba)'], ['sj', 'Surat jalan ke brand'], ['invoice', 'Invoice untuk brand'], ['po', 'Purchase Order ke vendor subcon'], ['internal', 'Rincian internal (dengan biaya dan laba)']];
 
   var scheme = null;
   var state = load();
-  loadAtt();
   document.getElementById('logo').src = LOGO;
 
   function copyDef() {
     var s = {}, k;
     for (k in DEF) s[k] = DEF[k];
     s.custom = DEF.custom.map(function (c) { return { n: c.n, v: c.v, by: c.by }; });
-    s.vendors = [];
+    s.vendors = []; s.grid = []; s.dlv = []; s.poNos = {}; s.seq = { QT: 0, INV: 0, PO: 0, SJ: 0 };
     return s;
   }
   function load() {
@@ -375,7 +396,225 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     for (k in OLDD) if (s[k] === OLDD[k]) s[k] = DEF[k];
     return s;
   }
-  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+  var ORD = 'pandera-orders-v1';
+  var GLOBAL = ['usaha', 'alamat', 'telp', 'ttd', 'ttdImg', 'bank', 'rek', 'atasNama', 'vendors', 'seq', 'attQuote', 'attPo', 'pdfMode', 'bulat', 'invCatatan', 'poBayar', 'poCatatan'];
+  var orders = { list: [] };
+  function perOrder(s) { var o = {}, k; for (k in s) if (GLOBAL.indexOf(k) < 0) o[k] = s[k]; return JSON.parse(JSON.stringify(o)); }
+  function loadOrders() {
+    try { var o = JSON.parse(localStorage.getItem(ORD) || 'null'); if (o && Array.isArray(o.list)) orders = o; } catch (e) {}
+    if (!state.orderId) state.orderId = 'o' + Date.now().toString(36);
+    if (!orders.list.some(function (x) { return x.id === state.orderId; })) orders.list.unshift({ id: state.orderId, upd: Date.now(), d: perOrder(state) });
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+    for (var i = 0; i < orders.list.length; i++) if (orders.list[i].id === state.orderId) { orders.list[i].d = perOrder(state); orders.list[i].upd = Date.now(); }
+    try { localStorage.setItem(ORD, JSON.stringify(orders)); } catch (e) {}
+  }
+  function openOrder(id) {
+    var o = null; orders.list.forEach(function (x) { if (x.id === id) o = x; });
+    if (!o) return;
+    save();
+    var d = JSON.parse(JSON.stringify(o.d)), k;
+    for (k in DEF) if (GLOBAL.indexOf(k) < 0) state[k] = d[k] !== undefined ? d[k] : JSON.parse(JSON.stringify(DEF[k]));
+    state.orderId = id;
+    save(); renderAtt();
+    enter(state.scheme || 'FOB');
+  }
+  function newOrder(sch) {
+    save();
+    var keep = perOrder(state);
+    ['brand', 'up', 'brandAlamat', 'nomor', 'invNo', 'invPoRef', 'poNomor', 'sjSel', 'invDlv', 'poVendor'].forEach(function (k) { keep[k] = ''; });
+    keep.invQty = 0; keep.invDP = 0; keep.hargaFix = 0; keep.dlv = []; keep.poNos = {}; keep.qty = DEF.qty;
+    keep.grid = []; keep.orderId = 'o' + Date.now().toString(36); keep.scheme = sch;
+    for (var k in keep) state[k] = keep[k];
+    orders.list.unshift({ id: state.orderId, upd: Date.now(), d: perOrder(state) });
+    save(); renderAtt();
+    enter(sch);
+  }
+  function delOrder(id) {
+    if (orders.list.length <= 1) { alert('Ini satu-satunya order, tidak bisa dihapus.'); return; }
+    if (!confirm('Hapus order ini beserta lampirannya? Tidak bisa dibatalkan.')) return;
+    orders.list = orders.list.filter(function (x) { return x.id !== id; });
+    ATT.filter(function (a) { return a.order === id; }).forEach(function (a) { delAtt(a.id); });
+    if (state.orderId === id) {
+      var o = orders.list[0], d = JSON.parse(JSON.stringify(o.d));
+      for (var k in DEF) if (GLOBAL.indexOf(k) < 0) state[k] = d[k] !== undefined ? d[k] : JSON.parse(JSON.stringify(DEF[k]));
+      state.orderId = o.id;
+    }
+    save(); renderOrders();
+  }
+  function renderOrders() {
+    var box = document.getElementById('order-list');
+    if (!box) return;
+    var list = orders.list.slice().sort(function (a, b) { return b.upd - a.upd; });
+    box.innerHTML = list.map(function (o) {
+      var d = o.d, tot = gridTotal(d.grid), q = tot > 0 ? tot : d.qty;
+      var sent = (d.dlv || []).reduce(function (a, x) { return a + dlvTotal(x); }, 0);
+      return '<div class="orow' + (o.id === state.orderId ? ' cur' : '') + '"><button type="button" class="oopen" data-oopen="' + esc(o.id) + '">' +
+        '<b>' + esc(d.brand || 'Tanpa brand') + '</b> <span class="badge sm">' + esc(d.scheme || '-') + '</span><br>' +
+        '<span>' + esc(d.nama || '-') + ' · ' + n(q) + ' pcs' + (sent ? ' · terkirim ' + n(sent) : '') + '</span><br>' +
+        '<small>Diubah ' + new Date(o.upd).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + '</small></button>' +
+        '<button type="button" class="x" data-odel="' + esc(o.id) + '" aria-label="Hapus order">&times;</button></div>';
+    }).join('');
+  }
+  function nextNo(pre) {
+    state.seq = state.seq || {};
+    state.seq[pre] = (state.seq[pre] || 0) + 1;
+    var s = String(state.seq[pre]); while (s.length < 3) s = '0' + s;
+    return pre + '-' + new Date().getFullYear() + '-' + s;
+  }
+  function setField(k) { var el = document.getElementById('f-' + k); if (el && document.activeElement !== el) el.value = state[k]; }
+  // Beri nomor urut saat dokumen pertama kali dibuat.
+  function ensureNumbers() {
+    var m = state.pdfMode, ch = false;
+    if (m === 'brand' && !state.nomor) { state.nomor = nextNo('QT'); setField('nomor'); ch = true; }
+    if (m === 'invoice' && !state.invNo) { state.invNo = nextNo('INV'); setField('invNo'); ch = true; }
+    if (m === 'po' && state.poVendor) {
+      if (!state.poNos[state.poVendor]) { state.poNos[state.poVendor] = state.poNomor || nextNo('PO'); ch = true; }
+      if (state.poNomor !== state.poNos[state.poVendor]) { state.poNomor = state.poNos[state.poVendor]; setField('poNomor'); ch = true; }
+    }
+    if (ch) save();
+  }
+
+  /* ---------- Ukuran, warna, pengiriman ---------- */
+  function sizeList() { return String(state.sizes || '').split(/[,;]+/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function rowTotal(r) { var t = 0, k; for (k in (r.q || {})) t += +r.q[k] || 0; return t; }
+  function gridTotal(g) { return (g || []).reduce(function (a, r) { return a + rowTotal(r); }, 0); }
+  function dlvTotal(d) { var t = 0, k; for (k in (d.q || {})) t += +d.q[k] || 0; return t; }
+  function dlvById(id) { for (var i = 0; i < state.dlv.length; i++) if (state.dlv[i].id === id) return state.dlv[i]; return null; }
+  function syncQty() { var t = gridTotal(state.grid); if (t > 0) state.qty = t; }
+  // Tabel per warna x ukuran. src: baris grid order; get(r, sz) memberi angka.
+  function sizeTable(get, onlyNonZero, fmt) {
+    var n = fmt || window.__nId, sz = sizeList(), rows = [], col = {}, grand = 0;
+    state.grid.forEach(function (r) {
+      var vals = sz.map(function (s) { return +get(r, s) || 0; }), t = vals.reduce(function (a, b) { return a + b; }, 0);
+      if (onlyNonZero && !t) return;
+      vals.forEach(function (v, i) { col[i] = (col[i] || 0) + v; });
+      grand += t;
+      rows.push([r.w || '-'].concat(vals.map(function (v) { return n(v); })).concat([n(t)]));
+    });
+    if (!rows.length) return null;
+    var foot = ['Total'].concat(sz.map(function (s, i) { return n(col[i] || 0); })).concat([n(grand)]);
+    return { head: ['Warna'].concat(sz).concat(['Total']), rows: rows, foot: foot, total: grand };
+  }
+  function tablePdf(doc, t, y, L, R, enHead) {
+    var W = R - L, first = 42, cw = (W - first) / (t.head.length - 1), B = [3, 87, 166];
+    function cells(arr, bold) {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.text(String(arr[0]), L + 2, y);
+      for (var i = 1; i < arr.length; i++) doc.text(String(arr[i]), L + first + cw * i - 2, y, { align: 'right' });
+    }
+    if (y > 250) { doc.addPage(); y = 22; }
+    doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
+    doc.setFontSize(9.5); doc.setTextColor(255); cells(enHead || t.head, true); y += 8;
+    doc.setTextColor(0); doc.setFontSize(10);
+    t.rows.forEach(function (r) { if (y > 278) { doc.addPage(); y = 22; } cells(r, false); doc.setDrawColor(215); doc.setLineWidth(0.3); doc.line(L, y + 2.2, R, y + 2.2); y += 7; });
+    cells(t.foot, true); y += 9;
+    return y;
+  }
+  function tableHTML(t, enHead) {
+    var hd = enHead || t.head;
+    return '<table class="q"><thead><tr>' + hd.map(function (x, i) { return '<th' + (i ? ' style="text-align:right"' : '') + '>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      t.rows.map(function (r) { return '<tr>' + r.map(function (x, i) { return '<td' + (i ? ' style="text-align:right"' : '') + '>' + esc(x) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '<tr>' + t.foot.map(function (x, i) { return '<td style="font-weight:700' + (i ? ';text-align:right' : '') + '">' + esc(x) + '</td>'; }).join('') + '</tr></tbody></table>';
+  }
+  function renderGrid() {
+    var box = document.getElementById('grid-rows');
+    if (!box) return;
+    var sz = sizeList();
+    box.innerHTML = state.grid.map(function (r, i) {
+      return '<div class="grow"><div class="ghead"><input type="text" class="txt" data-gi="' + i + '" data-gf="w" placeholder="Warna" value="' + esc(r.w || '') + '">' +
+        '<button type="button" class="x" data-gdel="' + i + '" aria-label="Hapus warna">&times;</button></div><div class="gcells">' +
+        sz.map(function (s) { return '<label><span>' + esc(s) + '</span><input type="text" class="num" inputmode="numeric" data-gi="' + i + '" data-gs="' + esc(s) + '" value="' + fmtIn(+(r.q || {})[s] || 0) + '"></label>'; }).join('') +
+        '</div><div class="gsum">Total ' + esc(r.w || 'warna ini') + ': <b>' + n(rowTotal(r)) + '</b> pcs</div></div>';
+    }).join('') || '<p class="note">Belum ada rincian. Jumlah order memakai angka di kartu Order.</p>';
+    var el = document.getElementById('x-grid'); if (el) el.textContent = n(gridTotal(state.grid)) + ' pcs';
+  }
+  function renderDlv() {
+    var box = document.getElementById('dlv-rows');
+    if (!box) return;
+    var sz = sizeList(), tot = gridTotal(state.grid) || state.qty, sent = state.dlv.reduce(function (a, d) { return a + dlvTotal(d); }, 0);
+    var sm = document.getElementById('dlv-sum');
+    if (sm) sm.innerHTML = 'Terkirim <b>' + n(sent) + '</b> dari ' + n(tot) + ' pcs. Sisa <b>' + n(tot - sent) + '</b> pcs.';
+    box.innerHTML = state.dlv.map(function (d, i) {
+      var cells = state.grid.length ? state.grid.map(function (r) {
+        return '<div class="grow"><div class="gsum"><b>' + esc(r.w || 'Warna') + '</b></div><div class="gcells">' + sz.map(function (s) {
+          return '<label><span>' + esc(s) + '</span><input type="text" class="num" inputmode="numeric" data-di="' + i + '" data-dk="' + esc(r.id + '|' + s) + '" value="' + fmtIn(+(d.q || {})[r.id + '|' + s] || 0) + '"></label>';
+        }).join('') + '</div></div>';
+      }).join('') : '<div class="field"><label>Jumlah dikirim (pcs)</label><input type="text" class="num" inputmode="numeric" data-di="' + i + '" data-dk="all" value="' + fmtIn(+(d.q || {}).all || 0) + '"></div>';
+      return '<details class="dlv"' + (i === state.dlv.length - 1 ? ' open' : '') + '><summary><b>' + esc(d.no) + '</b> · ' + esc(d.tgl || '-') + ' · ' + n(dlvTotal(d)) + ' pcs</summary>' +
+        '<div class="field"><label>Tanggal kirim</label><input type="text" class="txt" data-di="' + i + '" data-df="tgl" value="' + esc(d.tgl || '') + '"></div>' +
+        '<div class="field"><label>Jumlah koli / karton</label><input type="text" class="txt" data-di="' + i + '" data-df="koli" value="' + esc(d.koli || '') + '"></div>' +
+        '<div class="field"><label>Kendaraan / sopir</label><input type="text" class="txt" data-di="' + i + '" data-df="sopir" value="' + esc(d.sopir || '') + '"></div>' +
+        cells +
+        '<div class="field full"><label>Catatan</label><textarea class="txt" rows="2" data-di="' + i + '" data-df="cat">' + esc(d.cat || '') + '</textarea></div>' +
+        '<div class="actions"><button type="button" data-dfill="' + i + '">Isi dengan semua sisa</button><button type="button" class="danger" data-ddel="' + i + '">Hapus pengiriman</button></div></details>';
+    }).join('');
+    refreshDlvSelects();
+  }
+  function refreshDlvSelects() {
+    [['f-sjSel', 'sjSel', 'Pilih pengiriman'], ['f-invDlv', 'invDlv', 'Seluruh order / jumlah manual']].forEach(function (x) {
+      var el = document.getElementById(x[0]);
+      if (!el) return;
+      el.innerHTML = '<option value="">' + x[2] + '</option>' + state.dlv.map(function (d) {
+        return '<option value="' + esc(d.id) + '"' + (state[x[1]] === d.id ? ' selected' : '') + '>' + esc(d.no + ' · ' + (d.tgl || '') + ' · ' + n(dlvTotal(d)) + ' pcs') + '</option>';
+      }).join('');
+    });
+  }
+  function sjData() {
+    var d = dlvById(state.sjSel);
+    if (!d) return null;
+    var t = state.grid.length ? sizeTable(function (r, s) { return (d.q || {})[r.id + '|' + s]; }, true) : null;
+    var meta = [['No. surat jalan', d.no], ['Tanggal', d.tgl || '-'], ['Kepada', (state.brand || '-') + (state.up ? ' (u.p. ' + state.up + ')' : '')]];
+    if (state.brandAlamat) meta.push(['Alamat', state.brandAlamat]);
+    if (state.invPoRef) meta.push(['No. PO brand', state.invPoRef]);
+    meta.push(['Produk', state.nama || '-']);
+    if (d.koli) meta.push(['Jumlah koli', d.koli]);
+    if (d.sopir) meta.push(['Kendaraan / sopir', d.sopir]);
+    return { usaha: state.usaha, alamat: state.alamat, telp: state.telp, meta: meta, table: t, total: dlvTotal(d), cat: d.cat, ttd: state.ttd || state.usaha, ttdImg: state.ttdImg, no: d.no };
+  }
+  function makeSjPdf(q) {
+    var J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) return null;
+    var doc = new J({ unit: 'mm', format: 'a4' });
+    var L = 18, R = 192, W = R - L;
+    var y = kopPdf(doc, q, L, R);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0);
+    doc.text('SURAT JALAN', L, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(110); doc.text('Delivery note', L + 46, y); y += 8;
+    doc.setFontSize(10);
+    q.meta.forEach(function (m) {
+      doc.setTextColor(110); doc.text(m[0], L, y); doc.setTextColor(0);
+      var ls = doc.splitTextToSize(String(m[1]), W - 38); doc.text(ls, L + 38, y); y += ls.length * 5 + 0.8;
+    });
+    y += 6;
+    if (q.table) y = tablePdf(doc, q.table, y, L, R);
+    else { doc.setFont('helvetica', 'bold'); doc.text('Jumlah dikirim: ' + n(q.total) + ' pcs', L, y); y += 9; }
+    if (q.cat) { var cl = doc.splitTextToSize(q.cat, W); doc.setFont('helvetica', 'bold'); doc.text('Catatan', L, y); y += 5; doc.setFont('helvetica', 'normal'); doc.text(cl, L, y); y += cl.length * 4.8 + 4; }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(60);
+    var ck = doc.splitTextToSize('Barang diterima dalam keadaan baik dan jumlah sesuai, kecuali dicatat di atas.', W); doc.text(ck, L, y); y += ck.length * 4.6 + 4;
+    if (y > 235) { doc.addPage(); y = 22; }
+    y += 6; doc.setFontSize(10); doc.setTextColor(0);
+    var cx = [L, L + 62, L + 124];
+    doc.text('Pengirim,', cx[0], y); doc.text('Sopir / kurir,', cx[1], y); doc.text('Penerima,', cx[2], y);
+    if (q.ttdImg) { try { var tp = doc.getImageProperties(q.ttdImg), tw = 40, th = tw * tp.height / tp.width; if (th > 16) { th = 16; tw = th * tp.width / tp.height; } doc.addImage(q.ttdImg, 'PNG', L, y + 19 - th, tw, th); } catch (e) {} }
+    y += 26; doc.setDrawColor(0); doc.setLineWidth(0.3);
+    cx.forEach(function (x) { doc.line(x, y - 5, x + 50, y - 5); });
+    doc.setFont('helvetica', 'bold'); doc.text(q.ttd || '', cx[0], y);
+    doc.setFont('helvetica', 'normal'); doc.text('(Nama)', cx[1], y); doc.text('(Nama, tanggal, cap)', cx[2], y);
+    return doc;
+  }
+  function sjHTML(q) {
+    function br(t) { return esc(t || '').replace(/\n/g, '<br>'); }
+    var h = '<div class="kop"><img src="' + LOGO + '" alt=""><div class="a"><b>' + esc(q.usaha || '') + '</b>' +
+      (q.alamat ? '<br>' + br(q.alamat) : '') + (q.telp ? '<br>Tel/WhatsApp: ' + esc(q.telp) : '') + '</div></div>';
+    h += '<h1>SURAT JALAN <small style="font-weight:400;font-size:13px;color:#666">Delivery note</small></h1>';
+    q.meta.forEach(function (m) { h += '<div class="m"><b>' + esc(m[0]) + '</b>' + br(m[1]) + '</div>'; });
+    h += q.table ? tableHTML(q.table) : '<div class="nt"><b>Jumlah dikirim: ' + n(q.total) + ' pcs</b></div>';
+    if (q.cat) h += '<div class="nt"><b>Catatan</b>' + br(q.cat) + '</div>';
+    h += '<div class="nt" style="color:#555">Barang diterima dalam keadaan baik dan jumlah sesuai, kecuali dicatat di atas.</div>';
+    h += '<div class="ttd ttd3"><div>Pengirim,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:160px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div>Sopir / kurir,<div class="sp"></div>(Nama)</div><div>Penerima,<div class="sp"></div>(Nama, tanggal, cap)</div></div>';
+    return h;
+  }
 
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
@@ -390,6 +629,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   }
   function fmtIn(v) { return String(v).replace('.', ','); }
 
+  window.__nId = function (x) { return n(x); };
   function n(x) { return isFinite(x) ? Math.round(x).toLocaleString('id-ID') : '-'; }
   function rp(x) { return isFinite(x) ? 'Rp ' + (x < 0 ? '-' : '') + Math.abs(Math.round(x)).toLocaleString('id-ID') : '-'; }
   function pct(x) { return isFinite(x) ? (x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '%' : '-'; }
@@ -436,10 +676,11 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   }
   function fieldHTML(f) {
     var key = f[0], label = f[1], kind = f[2], hint = f[3];
-    var h = '<div class="field' + (kind === 'area' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
+    var h = '<div class="field' + (kind === 'area' || key === 'sizes' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
     if (kind === 'mode') h += selectHTML(key, MODES);
     else if (kind === 'pdf') h += selectHTML(key, PDFMODES);
     else if (kind === 'check') return '<label class="chk"><input type="checkbox" id="f-' + key + '" data-k="' + key + '"' + (state[key] ? ' checked' : '') + '> ' + esc(label) + '</label>';
+    else if (kind === 'dlvsel') h += '<select id="f-' + key + '" data-k="' + key + '"></select>';
     else if (kind === 'vendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '">' + vendorOptions(state[key]) + '</select>';
     else if (kind === 'povendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '"></select>';
     else if (kind === 'area') h += '<textarea class="txt" rows="3" id="f-' + key + '" data-k="' + key + '">' + esc(state[key]) + '</textarea>';
@@ -534,7 +775,11 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function buildInputs() {
     var fob = scheme === 'FOB';
     var h = '';
-    h += card('Order', null, [['nama', 'Nama produk', 'text'], ['brand', 'Untuk brand (opsional)', 'text'], ['qty', 'Jumlah order (pcs)']]);
+    h += card('Order', null, [['nama', 'Nama produk', 'text'], ['brand', 'Untuk brand (opsional)', 'text'], ['brandAlamat', 'Alamat brand (untuk surat jalan dan invoice)', 'area'], ['qty', 'Jumlah order (pcs)', null, 'Otomatis dari rincian ukuran kalau diisi.']]);
+    h += '<div class="card" id="c-grid"><h2>Ukuran dan warna</h2><p class="sub">Jumlah per warna dan ukuran. Totalnya otomatis jadi jumlah order.</p>' +
+      fieldHTML(['sizes', 'Daftar ukuran (pisahkan dengan koma)', 'text']) +
+      '<div id="grid-rows"></div><div class="actions" style="margin-top:6px"><button type="button" id="b-gadd">+ Tambah warna</button></div>' +
+      '<div class="total"><span>Total semua</span><span id="x-grid"></span></div></div>';
     if (fob) {
       h += card('Bahan', 'Harga kain per kg dan hasilnya.', [
         ['kain', 'Harga kain per kg (Rp)'],
@@ -560,13 +805,15 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       '<p class="sub">Vendor untuk pekerjaan yang tidak dikerjakan sendiri. Pilih vendornya di "dikerjakan oleh".</p>' +
       '<div id="vendor-rows"></div>' +
       '<div class="actions" style="margin-top:6px"><button type="button" id="b-vadd">+ Tambah vendor</button></div></div>';
+    h += '<div class="card" id="c-dlv"><h2>Pengiriman dan surat jalan</h2><p class="sub">Satu pengiriman = satu surat jalan. Nomor surat jalan otomatis.</p>' +
+      '<p class="note" id="dlv-sum"></p><div id="dlv-rows"></div><div class="actions" style="margin-top:6px"><button type="button" id="b-dadd">+ Pengiriman baru</button></div></div>';
     h += '<div class="card" id="c-att"><h2>Lampiran: tech pack dan desain</h2>' +
       '<p class="sub">Foto atau PDF dari brand. Foto dan PDF dari brand digabung sebagai halaman tambahan di akhir PDF saat Bagikan PDF.</p>' +
       '<div id="att-rows"></div>' +
       '<input type="file" id="f-attfile" accept="image/*,application/pdf" multiple hidden>' +
       '<div class="actions" style="margin-top:6px"><button type="button" id="b-att">+ Tambah lampiran</button></div>' +
       fieldHTML(['attQuote', 'Lampirkan ke Quotation', 'check']) + fieldHTML(['attPo', 'Lampirkan ke PO subcon', 'check']) +
-      '<div class="hint">Lampiran hanya disimpan di HP ini. Hapus lampiran order lama sebelum order baru.</div></div>';
+      '<div class="hint">Lampiran hanya disimpan di HP ini. Lampiran tersimpan per order.</div></div>';
     h += card('Target laba', null, [
       ['mode', 'Target laba dihitung dari', 'mode'],
       ['target', 'Target laba bersih (Rp per pcs)'],
@@ -592,13 +839,15 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     more.push(['bulat', 'Pembulatan harga jual (Rp)', null, 'Harga jual dibulatkan ke atas']);
     h += '<div class="card"><details><summary>Pengaturan tambahan</summary>' + more.map(fieldHTML).join('') + '</details></div>';
     document.getElementById('col-inputs').innerHTML = h;
-    renderCustom(); renderVendors(); renderAtt();
+    renderCustom(); renderVendors(); renderAtt(); renderGrid(); renderDlv();
 
     document.getElementById('col-pdf').innerHTML =
       '<h2>PDF dan cetak</h2><p class="sub">Bagikan hasilnya ke brand atau simpan sebagai PDF.</p>' +
       [['pdfMode', 'Isi PDF', 'pdf']].map(fieldHTML).join('') +
+      '<div id="sj-box">' + [['sjSel', 'Surat jalan untuk pengiriman', 'dlvsel']].map(fieldHTML).join('') + '<div class="hint">Buat pengirimannya dulu di kartu Pengiriman dan surat jalan.</div></div>' +
       '<div id="inv-box">' + [['invNo', 'Nomor invoice (kosongkan untuk otomatis)', 'text'], ['invPoRef', 'Nomor PO dari brand (opsional)', 'text'],
-        ['invQty', 'Jumlah yang ditagih (pcs)', null, 'Isi 0 untuk seluruh order. Untuk tagihan per pengiriman, isi jumlah yang dikirim.'],
+        ['invDlv', 'Tagih untuk', 'dlvsel', 'Pilih pengiriman supaya jumlah dan nomor surat jalan ikut otomatis.'],
+        ['invQty', 'Jumlah yang ditagih (pcs)', null, 'Dipakai kalau tidak memilih pengiriman. Isi 0 untuk seluruh order.'],
         ['invTempo', 'Jatuh tempo (hari setelah invoice)'], ['invPajak', 'Pajak / PPN (%)', null, 'Isi 0 kalau tidak memungut PPN.'],
         ['invDP', 'Dikurangi DP yang sudah dibayar (Rp)'],
         ['bank', 'Nama bank', 'text'], ['rek', 'Nomor rekening', 'text'], ['atasNama', 'Atas nama rekening', 'text'],
@@ -646,6 +895,9 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     showTtd();
     var c = calc(state, scheme);
     var ib = document.getElementById('inv-box'); if (ib) ib.hidden = state.pdfMode !== 'invoice';
+    var sb = document.getElementById('sj-box'); if (sb) sb.hidden = state.pdfMode !== 'sj';
+    var qe = document.getElementById('f-qty'); if (qe) qe.disabled = gridTotal(state.grid) > 0;
+    var qn = document.getElementById('f-invQty'); if (qn) qn.parentNode.hidden = !!state.invDlv;
     var pb = document.getElementById('po-box');
     if (pb) {
       pb.hidden = state.pdfMode !== 'po';
@@ -729,6 +981,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       ] });
       d.note = fob ? 'Harga sudah termasuk kain, rib, dan biaya pengerjaan.' : 'Harga untuk jasa pengerjaan (cutting, making, trimming). Kain disediakan oleh brand.';
     }
+    if (state.pdfMode === 'sj') { var sd = dlvById(state.sjSel); d.title = 'Surat Jalan'; d.file = 'Surat-Jalan-' + (sd ? sd.no : ''); }
     if (state.pdfMode === 'invoice') { d.title = 'Invoice'; d.file = 'Invoice-' + (state.invNo ? state.invNo.replace(/[^A-Za-z0-9]+/g, '-') : scheme); }
     if (state.pdfMode === 'po') {
       var pv = vendorById(state.poVendor);
@@ -801,12 +1054,12 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       produk: state.nama || '-', spek: state.spek, qty: en(state.qty) + ' pcs', harga: 'Rp ' + en(c.harga), total: 'Rp ' + en(c.omzet),
       notes: [['Price includes', termasuk], ['Price excludes', state.belum], ['Payment terms', state.bayar],
         ['Delivery and production time', state.kirim], ['Other terms', state.ketentuan]].filter(function (x) { return x[1] && String(x[1]).trim(); }),
-      ttd: state.ttd || state.usaha, ttdImg: state.ttdImg
+      ttd: state.ttd || state.usaha, ttdImg: state.ttdImg, sizes: state.grid.length ? sizeTable(function (r, s) { return (r.q || {})[s]; }, false, en) : null
     };
   }
 
   /* ---------- Lampiran (disimpan di IndexedDB HP) ---------- */
-  var ATT = [];
+  var ALL = [], ATT = [];
   function idb(cb) {
     try {
       var r = indexedDB.open('pandera-lampiran', 1);
@@ -819,18 +1072,23 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     idb(function (db) {
       if (!db) return;
       var q = db.transaction('files').objectStore('files').getAll();
-      q.onsuccess = function () { ATT = (q.result || []).sort(function (a, b) { return a.id < b.id ? -1 : 1; }); renderAtt(); };
+      q.onsuccess = function () {
+        ALL = (q.result || []).sort(function (a, b) { return a.id < b.id ? -1 : 1; });
+        ALL.forEach(function (a) { if (!a.order) { a.order = state.orderId; db.transaction('files', 'readwrite').objectStore('files').put(a); } });
+        renderAtt();
+      };
     });
   }
   function putAtt(rec) {
-    ATT.push(rec); renderAtt();
+    rec.order = state.orderId; ALL.push(rec); renderAtt();
     idb(function (db) { if (db) db.transaction('files', 'readwrite').objectStore('files').put(rec); });
   }
   function delAtt(id) {
-    ATT = ATT.filter(function (a) { return a.id !== id; }); renderAtt();
+    ALL = ALL.filter(function (a) { return a.id !== id; }); renderAtt();
     idb(function (db) { if (db) db.transaction('files', 'readwrite').objectStore('files').delete(id); });
   }
   function renderAtt() {
+    ATT = ALL.filter(function (a) { return a.order === state.orderId; });
     var box = document.getElementById('att-rows');
     if (!box) return;
     box.innerHTML = ATT.map(function (a) {
@@ -894,7 +1152,8 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     function en(x) { return isFinite(x) ? Math.round(x).toLocaleString('en-US') : '-'; }
     function dt(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
     function pad(x) { return (x < 10 ? '0' : '') + x; }
-    var qty = state.invQty > 0 ? state.invQty : state.qty;
+    var dv = dlvById(state.invDlv);
+    var qty = dv ? dlvTotal(dv) : (state.invQty > 0 ? state.invQty : state.qty);
     var sub = c.harga * qty, tax = sub * (state.invPajak || 0) / 100, dp = state.invDP || 0, due = sub + tax - dp;
     var sums = [['Subtotal', 'Rp ' + en(sub)]];
     if (tax > 0) sums.push(['VAT ' + fmtIn(state.invPajak) + '%', 'Rp ' + en(tax)]);
@@ -903,7 +1162,9 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var meta = [['Invoice No.', state.invNo || ('INV-' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()))], ['Date', dt(now)],
       ['Due date', dt(new Date(now.getTime() + (state.invTempo || 0) * 86400000))],
       ['Bill to', (state.brand || '-') + (state.up ? ' (Attn: ' + state.up + ')' : '')]];
+    if (state.brandAlamat) meta.push(['Address', state.brandAlamat]);
     if (state.invPoRef) meta.push(['Customer PO', state.invPoRef]);
+    if (dv) meta.push(['Delivery note', dv.no + ' (' + (dv.tgl || '') + ')']);
     var pay = [];
     if (state.bank) pay.push(['Bank', state.bank]);
     if (state.rek) pay.push(['Account no.', state.rek]);
@@ -999,7 +1260,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
       tanggal: now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
       vendor: vendorName(v, state.vendors.indexOf(v)), valamat: v.a, vtelp: v.t,
       produk: state.nama || '-', rows: rows, total: rp(tot), notes: notes,
-      ttd: state.ttd || state.usaha, ttdImg: state.ttdImg
+      ttd: state.ttd || state.usaha, ttdImg: state.ttdImg, sizes: state.grid.length ? sizeTable(function (r, s) { return (r.q || {})[s]; }) : null
     };
   }
 
@@ -1051,6 +1312,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     });
     doc.setFont('helvetica', 'bold'); doc.text('Total', L + 135, y, { align: 'right' }); doc.text(q.total, L + 172, y, { align: 'right' });
     y += 11;
+    if (q.sizes) { doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0); doc.text('Rincian ukuran dan warna', L, y); y += 7; y = tablePdf(doc, q.sizes, y, L, R) + 2; }
     q.notes.forEach(function (nt) {
       var ls = doc.splitTextToSize(String(nt[1]), W);
       if (y + 6 + ls.length * 4.8 > 272) { doc.addPage(); y = 22; }
@@ -1086,6 +1348,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     h += '<table class="q"><thead><tr><th>Pekerjaan</th><th style="text-align:right">Jumlah</th><th style="text-align:right">Harga/pcs</th><th style="text-align:right">Total</th></tr></thead><tbody>';
     q.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td style="text-align:right">' + esc(r[1]) + '</td><td style="text-align:right">' + esc(r[2]) + '</td><td style="text-align:right">' + esc(r[3]) + '</td></tr>'; });
     h += '<tr><td></td><td></td><td style="text-align:right"><b>Total</b></td><td style="text-align:right"><b>' + esc(q.total) + '</b></td></tr></tbody></table>';
+    if (q.sizes) h += '<div class="nt"><b>Rincian ukuran dan warna</b></div>' + tableHTML(q.sizes);
     q.notes.forEach(function (nt) { h += '<div class="nt"><b>' + esc(nt[0]) + '</b>' + br(nt[1]) + '</div>'; });
     h += '<div class="ttd"><div>Hormat kami,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:180px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div>Diterima oleh,<div class="sp"></div>' + esc(q.vendor) + '</div></div>';
     return h;
@@ -1134,6 +1397,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     doc.text(q.qty, L + 108, y, { align: 'right' }); doc.text(q.harga, L + 138, y, { align: 'right' });
     doc.setFont('helvetica', 'bold'); doc.text(q.total, L + 172, y, { align: 'right' });
     y += rh; doc.setDrawColor(200); doc.setLineWidth(0.3); doc.line(L, y - 3, R, y - 3); y += 7;
+    if (q.sizes) { doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0); doc.text('Size breakdown', L, y); y += 7; y = tablePdf(doc, q.sizes, y, L, R, ['Color'].concat(q.sizes.head.slice(1))) + 2; }
 
     q.notes.forEach(function (nt) {
       doc.setFontSize(10);
@@ -1171,6 +1435,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     h += '<div class="m"><b>Subject</b>' + esc(q.perihal) + '</div>';
     h += '<table class="q"><thead><tr><th>Product</th><th>Specification</th><th style="text-align:right">Quantity</th><th style="text-align:right">Unit price</th><th style="text-align:right">Total</th></tr></thead><tbody><tr>' +
       '<td>' + esc(q.produk) + '</td><td>' + br(q.spek || '-') + '</td><td style="text-align:right">' + esc(q.qty) + '</td><td style="text-align:right">' + esc(q.harga) + '</td><td style="text-align:right"><b>' + esc(q.total) + '</b></td></tr></tbody></table>';
+    if (q.sizes) h += '<div class="nt"><b>Size breakdown</b></div>' + tableHTML(q.sizes, ['Color'].concat(q.sizes.head.slice(1)));
     q.notes.forEach(function (nt) { h += '<div class="nt"><b>' + esc(nt[0]) + '</b>' + br(nt[1]) + '</div>'; });
     h += '<div class="ttd"><div>Sincerely,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:180px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div>Approved by,<div class="sp"></div>(Name and date)</div></div>';
     return h;
@@ -1179,7 +1444,9 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   function setNote(t) { var el = document.getElementById('pdf-note'); if (el) el.textContent = t; }
 
   function buildDoc() {
+    ensureNumbers();
     var m = state.pdfMode;
+    if (m === 'sj') return makeSjPdf(sjData());
     if (m === 'internal') return makePdf(docData());
     if (m === 'po') { var doc = makePoPdf(poData()); if (doc) attPagesPdf(doc, attFor('po'), 'Lampiran'); return doc; }
     if (m === 'invoice') return makeInvPdf(invData());
@@ -1238,6 +1505,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     if (pendingFile) { var pf = pendingFile; pendingFile = null; shareFile(pf.file, pf.blob, pf.name, pf.title, pf.msg); return; }
     var d = docData();
     var doc;
+    if (state.pdfMode === 'sj' && !sjData()) { setNote('Pilih pengiriman untuk surat jalan. Buat dulu di kartu Pengiriman dan surat jalan.'); return; }
     if (state.pdfMode === 'po' && !poData()) { setNote('PO belum bisa dibuat. Pilih vendor dan pastikan ada pekerjaan yang diberikan ke vendor itu.'); return; }
     try { doc = buildDoc(); } catch (e) { doc = null; }
     if (!doc) { setNote('PDF belum bisa dibuat. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
@@ -1256,8 +1524,10 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   }
 
   function sheetHTML() {
+    ensureNumbers();
     var d = docData();
     var h, m = state.pdfMode;
+    if (m === 'sj') { var sq = sjData(); if (!sq) { setNote('Pilih pengiriman untuk surat jalan.'); return; } return sjHTML(sq); }
     function go(html) { return html; }
     if (m === 'po') {
       var pq = poData();
@@ -1314,7 +1584,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
 
   /* ---------- Layar ---------- */
   function enter(sch) {
-    scheme = sch;
+    scheme = sch; state.scheme = sch;
     var fob = sch === 'FOB';
     document.getElementById('v-home').hidden = true;
     document.getElementById('v-calc').hidden = false;
@@ -1329,6 +1599,7 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
   }
   function home() {
     scheme = null;
+    renderOrders();
     document.getElementById('v-calc').hidden = true;
     document.getElementById('v-home').hidden = false;
     window.scrollTo(0, 0);
@@ -1340,6 +1611,28 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     if (el.id === 'f-attfile') { if (e.type === 'change') { addAttFiles(el.files); el.value = ''; } return; }
     if (el.type === 'checkbox' && el.getAttribute('data-k')) { state[el.getAttribute('data-k')] = el.checked; save(); return; }
     if (el.id === 'f-ttdfile') { if (e.type === 'change') { loadTtd(el.files && el.files[0]); el.value = ''; } return; }
+    var gi = el.getAttribute('data-gi');
+    if (gi !== null) {
+      var gr = state.grid[+gi]; if (!gr) return;
+      if (el.getAttribute('data-gf') === 'w') gr.w = el.value;
+      else { gr.q = gr.q || {}; gr.q[el.getAttribute('data-gs')] = parseNum(el.value) || 0; }
+      syncQty(); save(); render(); setField('qty');
+      var gs = el.closest('.grow').querySelector('.gsum'); if (gs) gs.innerHTML = 'Total ' + esc(gr.w || 'warna ini') + ': <b>' + n(rowTotal(gr)) + '</b> pcs';
+      var xg = document.getElementById('x-grid'); if (xg) xg.textContent = n(gridTotal(state.grid)) + ' pcs';
+      return;
+    }
+    var di = el.getAttribute('data-di');
+    if (di !== null) {
+      var dv = state.dlv[+di]; if (!dv) return;
+      if (el.getAttribute('data-df')) dv[el.getAttribute('data-df')] = el.value;
+      else { dv.q = dv.q || {}; dv.q[el.getAttribute('data-dk')] = parseNum(el.value) || 0; }
+      save(); render();
+      var su = el.closest('details').querySelector('summary'); if (su) su.innerHTML = '<b>' + esc(dv.no) + '</b> · ' + esc(dv.tgl || '-') + ' · ' + n(dlvTotal(dv)) + ' pcs';
+      var tot = gridTotal(state.grid) || state.qty, sent = state.dlv.reduce(function (a, d) { return a + dlvTotal(d); }, 0);
+      var sm = document.getElementById('dlv-sum'); if (sm) sm.innerHTML = 'Terkirim <b>' + n(sent) + '</b> dari ' + n(tot) + ' pcs. Sisa <b>' + n(tot - sent) + '</b> pcs.';
+      if (e.type === 'change') refreshDlvSelects();
+      return;
+    }
     var vi = el.getAttribute('data-vi');
     if (vi !== null) {
       var vd = state.vendors[+vi];
@@ -1362,6 +1655,9 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     if (!k) return;
     if (el.tagName === 'SELECT' || el.classList.contains('txt')) state[k] = el.value;
     else state[k] = parseNum(el.value);
+    if (k === 'poVendor') { state.poNomor = state.poNos[state.poVendor] || ''; setField('poNomor'); }
+    if (k === 'poNomor' && state.poVendor) state.poNos[state.poVendor] = state.poNomor;
+    if (k === 'sizes' && e.type === 'change') { renderGrid(); renderDlv(); }
     save(); render(); pendingFile = null;
   }
 
@@ -1391,7 +1687,24 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     var t = e.target;
     if (!t || !t.closest) return;
     var ch = t.closest('[data-scheme]');
-    if (ch) { enter(ch.getAttribute('data-scheme')); return; }
+    if (ch) { newOrder(ch.getAttribute('data-scheme')); return; }
+    var oo = t.closest('[data-oopen]'); if (oo) { openOrder(oo.getAttribute('data-oopen')); return; }
+    var od = t.closest('[data-odel]'); if (od) { delOrder(od.getAttribute('data-odel')); return; }
+    var gd = t.closest('[data-gdel]');
+    if (gd) { state.grid.splice(+gd.getAttribute('data-gdel'), 1); syncQty(); save(); renderGrid(); renderDlv(); render(); setField('qty'); return; }
+    var dd = t.closest('[data-ddel]');
+    if (dd) { if (!confirm('Hapus pengiriman ini?')) return; var gone = state.dlv.splice(+dd.getAttribute('data-ddel'), 1)[0]; if (gone && state.sjSel === gone.id) state.sjSel = ''; if (gone && state.invDlv === gone.id) state.invDlv = ''; save(); renderDlv(); render(); return; }
+    var df = t.closest('[data-dfill]');
+    if (df) {
+      var dv = state.dlv[+df.getAttribute('data-dfill')], sz = sizeList();
+      dv.q = {};
+      if (state.grid.length) state.grid.forEach(function (r) { sz.forEach(function (s) {
+        var sent = state.dlv.reduce(function (a, d) { return d === dv ? a : a + (+(d.q || {})[r.id + '|' + s] || 0); }, 0);
+        var left = (+(r.q || {})[s] || 0) - sent; if (left > 0) dv.q[r.id + '|' + s] = left;
+      }); });
+      else { var other = state.dlv.reduce(function (a, d) { return d === dv ? a : a + dlvTotal(d); }, 0); dv.q.all = Math.max(0, state.qty - other); }
+      save(); renderDlv(); render(); return;
+    }
     var adel = t.closest('[data-adel]');
     if (adel) { delAtt(adel.getAttribute('data-adel')); return; }
     var vdel = t.closest('[data-vdel]');
@@ -1412,6 +1725,11 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     }
     var id = t.id;
     if (id === 'b-back') home();
+    else if (id === 'b-gadd') { state.grid.push({ id: 'g' + Date.now().toString(36), w: '', q: {} }); save(); renderGrid(); renderDlv(); var gw = document.querySelectorAll('#grid-rows input[data-gf="w"]'); if (gw.length) gw[gw.length - 1].focus(); }
+    else if (id === 'b-dadd') {
+      var dn = { id: 'd' + Date.now().toString(36), no: nextNo('SJ'), tgl: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), koli: '', sopir: '', cat: '', q: {} };
+      state.dlv.push(dn); state.sjSel = dn.id; save(); renderDlv(); render();
+    }
     else if (id === 'b-att') document.getElementById('f-attfile').click();
     else if (id === 'b-vadd') {
       state.vendors.push({ id: 'v' + Date.now().toString(36), n: '', a: '', t: '' });
@@ -1432,13 +1750,16 @@ textarea.txt { width: 100%; min-height: 64px; padding: 6px 10px; border: 1px sol
     else if (id === 'b-pv-close') closePreview();
     else if (id === 'b-print') printSheet();
     else if (id === 'b-reset') {
-      var keepTtd = state.ttdImg, keepV = state.vendors;
-      state = copyDef(); state.ttdImg = keepTtd; state.vendors = keepV;
+      if (!confirm('Kembalikan isian order ini ke contoh?')) return;
+      var old = state; state = copyDef();
+      GLOBAL.concat(['orderId', 'scheme', 'brand', 'up', 'brandAlamat', 'grid', 'dlv', 'poNos']).forEach(function (k) { state[k] = old[k]; });
+      syncQty();
       save(); buildInputs(); render();
       setNote('Isian dikembalikan ke contoh kaos polos 24s.');
     }
   });
 
+  loadOrders(); save(); loadAtt(); renderOrders();
 })();
 </script>
 </body>
