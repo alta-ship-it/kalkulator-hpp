@@ -350,7 +350,8 @@ button.danger { color: var(--bad, #b3261e); }
     attQuote: true, attPo: true, invAttSj: true, invAttPo: true,
     orderId: '', scheme: '', brandAlamat: '', sizes: 'S, M, L, XL, XXL', grid: [], dlv: [], sjSel: '', invDlv: '', poNos: {},
     seq: { QT: 0, INV: 0, PO: 0, SJ: 0 },
-    vendors: [], byCutting: '', byMaking: '', byTrimming: '',
+    vendors: [], byCutting: '', byMaking: '', byTrimming: '', kerjaMode: 'rinci', cmtSub: 0, byCmt: '',
+    poInclude: 'Jasa cutting, making, trimming, dan packing per pcs.', poExclude: 'Kain, rib, dan aksesoris (label, hangtag) disediakan oleh kami. Ongkos kirim.',
     poVendor: '', poNomor: '', poKirim: '', poBayar: 'Pembayaran 14 hari setelah barang diterima dan dicek, transfer bank.', poCatatan: 'Barang yang cacat atau tidak sesuai spesifikasi dikembalikan untuk diperbaiki tanpa biaya tambahan.',
     qty: 15000,
     kain: 113400, hasil: 3, rol: 25, ribRol: 1, ribSel: 10000,
@@ -710,7 +711,7 @@ button.danger { color: var(--bad, #b3261e); }
     var c = {};
     c.kain = fob ? s.kain / y * sus : 0;
     c.rib = fob ? (s.kain + s.ribSel) * s.ribRol / (s.rol * y) * sus : 0;
-    c.kerja = s.cutting + s.making + s.trimming;
+    c.kerja = s.kerjaMode === 'borongan' ? (s.cmtSub || 0) : s.cutting + s.making + s.trimming;
     c.custom = s.custom.reduce(function (a, x) { return a + x.v; }, 0);
     c.reject = (c.kain + c.rib + c.kerja) * s.reject / 100;
     c.hpp = c.kain + c.rib + c.kerja + c.custom + c.reject;
@@ -733,11 +734,12 @@ button.danger { color: var(--bad, #b3261e); }
   }
   function fieldHTML(f) {
     var key = f[0], label = f[1], kind = f[2], hint = f[3];
-    var h = '<div class="field' + (kind === 'area' || kind === 'pdf' || kind === 'vendor' || kind === 'povendor' || kind === 'dlvsel' || key === 'sizes' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
+    var h = '<div class="field' + (kind === 'area' || kind === 'pdf' || kind === 'kmode' || kind === 'vendor' || kind === 'povendor' || kind === 'dlvsel' || key === 'sizes' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
     if (kind === 'mode') h += selectHTML(key, MODES);
     else if (kind === 'pdf') h += selectHTML(key, PDFMODES);
     else if (kind === 'check') return '<label class="chk"><input type="checkbox" id="f-' + key + '" data-k="' + key + '"' + (state[key] ? ' checked' : '') + '> ' + esc(label) + '</label>';
     else if (kind === 'dlvsel') h += '<select id="f-' + key + '" data-k="' + key + '"></select>';
+    else if (kind === 'kmode') h += selectHTML(key, [['rinci', 'Rinci: cutting, making, trimming'], ['borongan', 'Subcon borongan (satu harga)']]);
     else if (kind === 'vendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '">' + vendorOptions(state[key]) + '</select>';
     else if (kind === 'povendor') h += '<select class="vsel" id="f-' + key + '" data-k="' + key + '"></select>';
     else if (kind === 'area') h += '<textarea class="txt" rows="3" id="f-' + key + '" data-k="' + key + '">' + esc(state[key]) + '</textarea>';
@@ -763,7 +765,8 @@ button.danger { color: var(--bad, #b3261e); }
   }
   // Semua pekerjaan per pcs beserta siapa yang mengerjakan.
   function workItems() {
-    var w = [['Cutting', state.cutting, state.byCutting], ['Making (jahit)', state.making, state.byMaking], ['Trimming', state.trimming, state.byTrimming]];
+    var w = state.kerjaMode === 'borongan' ? [['Jasa jahit borongan (cutting, making, trimming)', state.cmtSub, state.byCmt]] :
+      [['Cutting', state.cutting, state.byCutting], ['Making (jahit)', state.making, state.byMaking], ['Trimming', state.trimming, state.byTrimming]];
     state.custom.forEach(function (x) { if (x.v > 0 || x.n) w.push([x.n || 'Biaya lain', x.v, x.by || '']); });
     return w.map(function (x) { return { l: x[0], v: x[1], by: vendorById(x[2]) ? x[2] : '' }; });
   }
@@ -848,11 +851,13 @@ button.danger { color: var(--bad, #b3261e); }
         ['ribSel', 'Selisih harga rib per kg (Rp)', null, 'Rib lebih mahal dari kain']
       ]);
     }
-    h += card('Biaya pengerjaan', 'Cutting, making, trimming. Rupiah per pcs.', [
-      ['cutting', 'Cutting'], ['byCutting', 'Cutting dikerjakan oleh', 'vendor'],
-      ['making', 'Making (jahit)'], ['byMaking', 'Making dikerjakan oleh', 'vendor'],
-      ['trimming', 'Trimming (finishing, benang)'], ['byTrimming', 'Trimming dikerjakan oleh', 'vendor']
-    ], '<div class="total"><span>Total pengerjaan</span><span id="x-kerja"></span></div>');
+    h += '<div class="card" id="c-kerja"><h2>Biaya pengerjaan</h2><p class="sub">Rupiah per pcs.</p>' +
+      fieldHTML(['kerjaMode', 'Cara pengerjaan', 'kmode']) +
+      '<div id="kerja-rinci">' + [['cutting', 'Cutting'], ['byCutting', 'Cutting dikerjakan oleh', 'vendor'],
+        ['making', 'Making (jahit)'], ['byMaking', 'Making dikerjakan oleh', 'vendor'],
+        ['trimming', 'Trimming (finishing, benang)'], ['byTrimming', 'Trimming dikerjakan oleh', 'vendor']].map(fieldHTML).join('') + '</div>' +
+      '<div id="kerja-borongan">' + [['byCmt', 'Vendor subcon', 'vendor'], ['cmtSub', 'Harga borongan per pcs (Rp)', null, 'Satu harga untuk cutting, making, dan trimming.']].map(fieldHTML).join('') + '</div>' +
+      '<div class="total"><span>Total pengerjaan</span><span id="x-kerja"></span></div></div>';
     h += '<div class="card" id="c-custom"><h2>Custom: biaya lain</h2>' +
       '<p class="sub">Plastik, overhead, atau biaya apa saja per pcs. Tambah atau hapus sesuai kebutuhan.</p>' +
       '<div id="custom-rows"></div>' +
@@ -913,6 +918,7 @@ button.danger { color: var(--bad, #b3261e); }
       fieldHTML(['invAttPo', 'Lampirkan PO dari brand', 'check']) + fieldHTML(['invAttSj', 'Lampirkan surat jalan', 'check']) +
       '<div class="actions"><button type="button" id="b-pobrand">+ Upload PO dari brand</button></div><div class="hint" id="inv-att"></div></div>' +
       '<div id="po-box">' + [['poVendor', 'Vendor tujuan PO', 'povendor'], ['poNomor', 'Nomor PO (kosongkan untuk otomatis)', 'text'],
+        ['poInclude', 'Harga sudah termasuk', 'area'], ['poExclude', 'Harga belum termasuk', 'area'],
         ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
         ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
       '<div class="hint" id="po-info"></div></div>' +
@@ -954,6 +960,8 @@ button.danger { color: var(--bad, #b3261e); }
   function render() {
     showTtd();
     var c = calc(state, scheme);
+    var kr = document.getElementById('kerja-rinci'), kb = document.getElementById('kerja-borongan');
+    if (kr) { kr.hidden = state.kerjaMode === 'borongan'; kb.hidden = state.kerjaMode !== 'borongan'; }
     var ib = document.getElementById('inv-box'); if (ib) { ib.hidden = state.pdfMode !== 'invoice'; renderInvAtt(); }
     var sb = document.getElementById('sj-box'); if (sb) sb.hidden = state.pdfMode !== 'sj';
     var qe = document.getElementById('f-qty'); if (qe) qe.disabled = gridTotal(state.grid) > 0;
@@ -969,7 +977,8 @@ button.danger { color: var(--bad, #b3261e); }
         info.textContent = !state.vendors.length ? 'Tambahkan vendor dulu di kartu Vendor subcon.' :
           !state.poVendor ? 'Pilih vendor tujuan PO.' :
           !its.length ? 'Belum ada pekerjaan yang diberikan ke vendor ini. Atur di "dikerjakan oleh".' :
-          'Isi PO: ' + its.map(function (w) { return w.l; }).join(', ') + '. Total ' + rp(its.reduce(function (a, w) { return a + w.v; }, 0) * state.qty) + '.';
+          'Isi PO: ' + its.map(function (w) { return w.l; }).join(', ') + '. Total ' + rp(its.reduce(function (a, w) { return a + w.v; }, 0) * state.qty) + '.' +
+          (state.grid.length ? '' : ' Rincian ukuran belum diisi. Isi kartu Ukuran dan warna supaya tabel ukuran masuk ke PO.');
       }
     }
     var el;
@@ -1334,7 +1343,7 @@ button.danger { color: var(--bad, #b3261e); }
     function pad(x) { return (x < 10 ? '0' : '') + x; }
     var tot = 0;
     var rows = its.map(function (w) { var t = w.v * state.qty; tot += t; return [w.l, n(state.qty) + ' pcs', rp(w.v), rp(t)]; });
-    var notes = [['Spesifikasi', state.spek], ['Batas waktu pengiriman', state.poKirim], ['Syarat pembayaran', state.poBayar], ['Catatan', state.poCatatan]]
+    var notes = [['Spesifikasi', state.spek], ['Harga sudah termasuk', state.poInclude], ['Harga belum termasuk', state.poExclude], ['Batas waktu pengiriman', state.poKirim], ['Syarat pembayaran', state.poBayar], ['Catatan', state.poCatatan]]
       .filter(function (x) { return x[1] && String(x[1]).trim(); });
     return {
       usaha: state.usaha, alamat: state.alamat, telp: state.telp,
@@ -1758,6 +1767,7 @@ button.danger { color: var(--bad, #b3261e); }
     if (!k) return;
     if (el.tagName === 'SELECT' || el.classList.contains('txt')) state[k] = el.value;
     else state[k] = parseNum(el.value);
+    if (k === 'kerjaMode' && state.kerjaMode === 'borongan' && !state.cmtSub) { state.cmtSub = state.cutting + state.making + state.trimming; setField('cmtSub'); }
     if (k === 'poVendor') { state.poNomor = state.poNos[state.poVendor] || ''; setField('poNomor'); }
     if (k === 'poNomor' && state.poVendor) state.poNos[state.poVendor] = state.poNomor;
     if (k === 'sizes' && e.type === 'change') { renderGrid(); renderDlv(); }
