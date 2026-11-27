@@ -345,7 +345,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
 
   var DEF = {
     nama: 'Plain T-shirt, combed 24s', brand: '',
-    usaha: 'Pandera Garmenindo', alamat: 'Jl. Katapang Andir, Kec. Baleendah, Andir, Kec. Dayeuhkolot, Kabupaten Bandung, Jawa Barat 40258', telp: '0811-2272-705', nomor: '', up: '', spek: 'Combed 24s, sizes S-XXL', berlaku: 14,
+    usaha: 'Pandera Garmenindo', alamat: 'Jl. Katapang Andir, Kec. Baleendah, Andir, Kec. Dayeuhkolot, Kabupaten Bandung, Jawa Barat 40258', telp: '0813-1122-5222', nomor: '', up: '', spek: 'Combed 24s, sizes S-XXL', berlaku: 14,
     termasuk: '', belum: 'Labels and hangtags (supplied by buyer), shipping cost.',
     bayar: 'Payment per delivery, bank transfer no later than Saturday.',
     kirim: 'Delivery every Friday. Production lead time to be agreed after the PO is received and materials are ready.',
@@ -412,6 +412,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
         }
       }
     } catch (e) {}
+    if (s.telp === '0811-2272-705') s.telp = '0813-1122-5222';
     var OLDD = {"nama": "Kaos polos 24s combed", "spek": "Combed 24s, ukuran S-XXL", "belum": "Label dan hangtag (dari brand), ongkos kirim.", "bayar": "Pembayaran tiap pengiriman, transfer paling lambat hari Sabtu.", "kirim": "Pengiriman tiap hari Jumat. Waktu produksi disepakati setelah PO diterima dan bahan siap.", "ketentuan": "Toleransi jumlah +/- 3%. Order yang dibatalkan setelah kain dibeli, biaya kain ditanggung brand. Perubahan warna, ukuran, atau jumlah disepakati tertulis sebelum produksi."};
     for (k in OLDD) if (s[k] === OLDD[k]) s[k] = DEF[k];
     return s;
