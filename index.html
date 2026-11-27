@@ -126,7 +126,8 @@ input.num, input.txt {
 input.txt { text-align: left; }
 select { width: 100%; min-height: 38px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 /* iPhone memperbesar layar kalau huruf kotak isian di bawah 16px. */
-input, select, textarea { font-size: 16px !important; }
+input, select, textarea { font-size: 16px !important; box-sizing: border-box; max-width: 100%; min-width: 0; }
+.field > *, .crow > *, .stack > *, .layout > * { min-width: 0; }
 html, body { overflow-x: hidden; max-width: 100%; }
 input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .total { display: flex; justify-content: space-between; padding: 10px 0 0; border-top: 2px solid var(--line); font-weight: 700; margin-top: 6px; }
@@ -365,7 +366,7 @@ button.danger { color: var(--bad, #b3261e); }
   };
 
   var MODES = [['rp', 'Rupiah per pcs'], ['markup', 'Persen dari biaya (HPP)'], ['margin', 'Persen dari harga jual']];
-  var PDFMODES = [['brand', 'Quotation untuk brand (tanpa biaya dan laba)'], ['sj', 'Surat jalan ke brand'], ['invoice', 'Invoice untuk brand'], ['po', 'Purchase Order ke vendor subcon'], ['internal', 'Rincian internal (dengan biaya dan laba)']];
+  var PDFMODES = [['brand', 'Quotation'], ['sj', 'Surat jalan'], ['invoice', 'Invoice'], ['po', 'PO ke subcon'], ['internal', 'Rincian internal']];
 
   var scheme = null;
   var state = load();
@@ -732,7 +733,7 @@ button.danger { color: var(--bad, #b3261e); }
   }
   function fieldHTML(f) {
     var key = f[0], label = f[1], kind = f[2], hint = f[3];
-    var h = '<div class="field' + (kind === 'area' || key === 'sizes' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
+    var h = '<div class="field' + (kind === 'area' || kind === 'pdf' || kind === 'vendor' || kind === 'povendor' || kind === 'dlvsel' || key === 'sizes' ? ' full' : '') + '"><label for="f-' + key + '">' + esc(label) + '</label>';
     if (kind === 'mode') h += selectHTML(key, MODES);
     else if (kind === 'pdf') h += selectHTML(key, PDFMODES);
     else if (kind === 'check') return '<label class="chk"><input type="checkbox" id="f-' + key + '" data-k="' + key + '"' + (state[key] ? ' checked' : '') + '> ' + esc(label) + '</label>';
