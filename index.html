@@ -92,6 +92,8 @@ h1 { font-family: var(--font-display); font-size: clamp(24px, 4vw, 32px); line-h
   border-top: 5px solid var(--accent);
 }
 .choice.cmt { border-top-color: var(--warn); }
+.choice.pl { border-top-color: #0357a6; }
+.choice.pl .big { font-size: 26px; }
 .choice:hover { background: var(--accent-soft); }
 .choice .big { font-family: var(--font-display); font-size: 34px; font-weight: 700; line-height: 1; }
 .choice .what { font-weight: 700; margin: 6px 0 8px; }
@@ -282,6 +284,11 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
         <div class="what">Kain dari brand</div>
         <div class="desc">Hanya biaya pengerjaan: cutting, making, trimming, dan biaya custom.</div>
       </button>
+      <button type="button" class="choice pl" id="b-openpl">
+        <div class="big">Packing list</div>
+        <div class="what">Daftar barang yang dikirim</div>
+        <div class="desc">Untuk kirim sampel, katalog, atau barang lain. Format bahasa Inggris dengan kop Pandera.</div>
+      </button>
     </div>
     <div class="card" style="margin-top:22px"><h2>Ringkasan pembayaran</h2><div id="pay-sum"></div></div>
     <h2 style="margin-top:28px">Order tersimpan</h2>
@@ -292,6 +299,20 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
       <div class="actions"><button type="button" class="primary" id="b-backup">Simpan cadangan</button><button type="button" id="b-restore">Pulihkan dari cadangan</button></div>
       <input type="file" id="f-restore" accept=".json,application/json" hidden>
       <p class="note" id="bk-note"></p></div>
+  </div>
+
+  <div id="v-pl" hidden>
+    <div class="topbar"><button type="button" id="b-plback">&larr; Halaman depan</button><span class="badge">Packing list</span></div>
+    <h1>Packing list</h1>
+    <p class="lead">Isi tujuan dan daftar barang. Nomor dibuat otomatis.</p>
+    <div class="stack">
+      <div class="card"><h2>Packing list tersimpan</h2><div class="field full"><select id="f-plpick"></select></div>
+        <div class="actions"><button type="button" id="b-plnew">+ Packing list baru</button><button type="button" class="danger" id="b-pldel">Hapus</button></div></div>
+      <div class="card" id="pl-form"></div>
+      <div class="card"><h2>PDF</h2>
+        <div class="actions"><button type="button" id="b-pl-preview">Lihat preview</button><button type="button" class="primary" id="b-pl-share">Bagikan PDF</button><button type="button" id="b-pl-save">Simpan ke File</button><button type="button" id="b-pl-print">Cetak</button></div>
+        <p class="note" id="pl-note"></p></div>
+    </div>
   </div>
 
   <div id="v-calc" hidden>
@@ -360,6 +381,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     pokVendor: '', pokNomor: '', pokItems: [], pokBayar: 'Pembayaran 30 hari setelah barang diterima, transfer bank.', pokKirim: '', pokCatatan: 'Warna dan kualitas sesuai sampel yang disetujui. Barang yang tidak sesuai dikembalikan.',
     ttb: [], ttbSel: '', kwSel: '', kwNos: {}, kwFrom: '', kwAmount: 0, kwFor: '', kwKota: 'Bandung',
     samples: [],
+    pls: [], plSel: '',
     satuan: 'kg', kainM: 0, pakaiM: 0, furingM: 0, pakaiFuring: 0,
     vendors: [], byCutting: '', byMaking: '', byTrimming: '', kerjaMode: 'rinci', cmtSub: 0, byCmt: '',
     poInclude: 'Jasa cutting, making, trimming, dan packing per pcs.', poExclude: 'Kain, rib, dan aksesoris (label, hangtag) disediakan oleh kami. Ongkos kirim.',
@@ -418,7 +440,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     return s;
   }
   var ORD = 'pandera-orders-v1';
-  var GLOBAL = ['invAttSj', 'invAttPo', 'usaha', 'alamat', 'telp', 'ttd', 'ttdImg', 'bank', 'rek', 'atasNama', 'vendors', 'seq', 'attQuote', 'attPo', 'pdfMode', 'bulat', 'invCatatan', 'poBayar', 'poCatatan'];
+  var GLOBAL = ['pls', 'plSel', 'invAttSj', 'invAttPo', 'usaha', 'alamat', 'telp', 'ttd', 'ttdImg', 'bank', 'rek', 'atasNama', 'vendors', 'seq', 'attQuote', 'attPo', 'pdfMode', 'bulat', 'invCatatan', 'poBayar', 'poCatatan'];
   var orders = { list: [] };
   function perOrder(s) { var o = {}, k; for (k in s) if (GLOBAL.indexOf(k) < 0) o[k] = s[k]; return JSON.parse(JSON.stringify(o)); }
   function loadOrders() {
@@ -1127,6 +1149,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
 
   /* ---------- Dokumen PDF dan cetak ---------- */
   function docData() {
+    if (curView === 'pl') { var cpd = curPl() || {}; return { title: 'Packing List', file: 'Packing-List-' + (cpd.no || '') + (cpd.to ? '-' + cpd.to.replace(/[^A-Za-z0-9]+/g, '-') : '') + '.pdf', meta: [], sections: [] }; }
     var c = calc(state, scheme), fob = scheme === 'FOB';
     var date = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     var skemaTxt = fob ? 'FOB (kain dari konveksi)' : 'CMT (kain dari brand)';
@@ -1368,6 +1391,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     });
   }
   function attFor(mode) {
+    if (curView === 'pl') return [];
     var plain = ATT.filter(function (a) { return !a.tag; });
     if (mode === 'brand' && state.attQuote) return plain;
     if (mode === 'po' && state.attPo) return plain;
@@ -1513,6 +1537,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
   /* ---------- Daftar barang (PO kain, tanda terima bahan) ---------- */
   function itemList(path) {
     if (path === 'pok') return state.pokItems;
+    if (path === 'pl') { var cp = curPl(); return cp ? cp.items : null; }
     var m = /^ttb:(\d+)$/.exec(path); if (m) { var t = state.ttb[+m[1]]; return t ? (t.items = t.items || []) : null; }
     return null;
   }
@@ -1560,6 +1585,69 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
       vendor: vendorName(v, state.vendors.indexOf(v)), valamat: v.a, vtelp: v.t, vendorId: v.id, totN: tot,
       perihal: 'Pembelian bahan untuk ' + (state.nama || 'produksi'), head: ['Barang', 'Keterangan', 'Jumlah', 'Harga/satuan'],
       rows: rows, total: rp(tot), notes: notes, sizes: null, ttd: state.ttd || state.usaha, ttdImg: state.ttdImg };
+  }
+
+  /* ---------- Packing list ---------- */
+  var curView = 'home';
+  function curPl() { for (var i = 0; i < state.pls.length; i++) if (state.pls[i].id === state.plSel) return state.pls[i]; return null; }
+  function newPl() {
+    var pl = { id: 'p' + Date.now().toString(36), no: '', tgl: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), to: '', attn: '', addr: '', koli: '', items: [], cat: 'Please check the items upon receipt. If anything is missing or damaged, kindly let us know within 2 days of receipt.' };
+    state.pls.push(pl); state.plSel = pl.id; save(); return pl;
+  }
+  function renderPl() {
+    var pl = curPl() || newPl();
+    var pick = document.getElementById('f-plpick');
+    pick.innerHTML = state.pls.slice().reverse().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc((x.no || 'Nomor otomatis') + ' · ' + (x.to || 'tanpa tujuan') + ' · ' + x.tgl) + '</option>'; }).join('');
+    function f(k, label, area) {
+      return '<div class="field' + (area ? ' full' : '') + '"><label>' + esc(label) + '</label>' + (area ? '<textarea class="txt" rows="2" data-pf="' + k + '">' + esc(pl[k] || '') + '</textarea>' : '<input type="text" class="txt" data-pf="' + k + '" value="' + esc(pl[k] || '') + '">') + '</div>';
+    }
+    document.getElementById('pl-form').innerHTML = '<h2>Isi packing list</h2>' + f('no', 'Nomor (kosongkan untuk otomatis)') + f('tgl', 'Tanggal') + f('to', 'Kepada') + f('attn', 'Attention (nama penerima)') + f('addr', 'Alamat', 1) + f('koli', 'Jumlah koli / paket') +
+      '<div class="field full"><label>Daftar barang</label></div><div id="pl-items">' + itemsHTML('pl', pl.items, false) + '</div>' +
+      '<div class="actions"><button type="button" data-itadd="pl">+ Tambah barang</button></div>' + f('cat', 'Catatan', 1) +
+      '<p class="note">Tanda tangan pengirim memakai tanda tangan dan nama di kartu Surat penawaran.</p>';
+  }
+  function openPl() { curView = 'pl'; document.getElementById('v-home').hidden = true; document.getElementById('v-calc').hidden = true; document.getElementById('v-pl').hidden = false; renderPl(); setNote(''); window.scrollTo(0, 0); }
+  function plData() {
+    var pl = curPl(); if (!pl || !pl.items.length) return null;
+    if (!pl.no) { pl.no = nextNo('PL'); save(); var pk = document.getElementById('f-plpick'); if (pk && pk.options[pk.selectedIndex]) pk.options[pk.selectedIndex].text = pl.no + ' · ' + (pl.to || 'tanpa tujuan') + ' · ' + pl.tgl; var nf = document.querySelector('[data-pf="no"]'); if (nf) nf.value = pl.no; }
+    return { usaha: state.usaha, alamat: state.alamat, telp: state.telp, pl: pl, ttd: state.ttd || state.usaha, ttdImg: state.ttdImg };
+  }
+  function makePlPdf(q) {
+    var J = window.jspdf && window.jspdf.jsPDF; if (!J) return null;
+    var doc = new J({ unit: 'mm', format: 'a4' }), L = 18, R = 192, W = R - L, B = [3, 87, 166], pl = q.pl;
+    var y = kopPdf(doc, q, L, R);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0); doc.text('PACKING LIST', L, y); y += 8;
+    var meta = [['No.', pl.no], ['Date', pl.tgl], ['To', (pl.to || '-') + (pl.attn ? ' (Attn: ' + pl.attn + ')' : '')]];
+    if (pl.addr) meta.push(['Address', pl.addr]);
+    if (pl.koli) meta.push(['Packages', pl.koli]);
+    y = metaPdf(doc, meta, y, L, W, 28) + 6;
+    var xs = [L + 3, L + 12, L + 110, L + 116, L + 136];
+    doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255);
+    doc.text('No', xs[0], y); doc.text('Item', xs[1], y); doc.text('Qty', xs[2], y, { align: 'right' }); doc.text('Unit', xs[3], y); doc.text('Remarks', xs[4], y); y += 8;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0);
+    pl.items.forEach(function (it, i) {
+      if (y > 268) { doc.addPage(); y = 22; }
+      var a = doc.splitTextToSize(it.d || '-', 84), k = doc.splitTextToSize(it.k || '', 38);
+      doc.text(String(i + 1), xs[0], y); doc.text(a, xs[1], y); doc.text(it.q ? fmtIn(it.q) : '', xs[2], y, { align: 'right' }); doc.text(it.u || '', xs[3], y); doc.text(k, xs[4], y);
+      y += Math.max(a.length, k.length, 1) * 5 + 1.5; doc.setDrawColor(215); doc.setLineWidth(0.3); doc.line(L, y - 3.5, R, y - 3.5); y += 2.5;
+    });
+    y += 3;
+    if (pl.cat) { doc.setFontSize(9.5); doc.setTextColor(80); var cl = doc.splitTextToSize(pl.cat, W); doc.text(cl, L, y); y += cl.length * 4.6 + 2; }
+    sigPdf(doc, y, L, R, ['Sent by,', q.ttd || '', true], ['Received by,', '(Name, date, stamp)'], q);
+    return doc;
+  }
+  function plHTML(q) {
+    var pl = q.pl;
+    var h = '<div class="kop"><img src="' + LOGO + '" alt=""><div class="a"><b>' + esc(q.usaha || '') + '</b>' + (q.alamat ? '<br>' + esc(q.alamat) : '') + (q.telp ? '<br>Tel/WhatsApp: ' + esc(q.telp) : '') + '</div></div>';
+    h += '<h1>PACKING LIST</h1><div class="m"><b>No.</b>' + esc(pl.no) + '</div><div class="m"><b>Date</b>' + esc(pl.tgl) + '</div><div class="m"><b>To</b>' + esc((pl.to || '-') + (pl.attn ? ' (Attn: ' + pl.attn + ')' : '')) + '</div>';
+    if (pl.addr) h += '<div class="m"><b>Address</b>' + esc(pl.addr) + '</div>';
+    if (pl.koli) h += '<div class="m"><b>Packages</b>' + esc(pl.koli) + '</div>';
+    h += '<table class="q"><thead><tr><th>No</th><th>Item</th><th style="text-align:right">Qty</th><th>Unit</th><th>Remarks</th></tr></thead><tbody>' +
+      pl.items.map(function (it, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(it.d || '-') + '</td><td style="text-align:right">' + (it.q ? fmtIn(it.q) : '') + '</td><td>' + esc(it.u || '') + '</td><td>' + esc(it.k || '') + '</td></tr>'; }).join('') + '</tbody></table>';
+    if (pl.cat) h += '<div class="nt" style="color:#555">' + esc(pl.cat) + '</div>';
+    h += '<div class="ttd"><div>Sent by,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:180px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div>Received by,<div class="sp"></div>(Name, date, stamp)</div></div>';
+    return h;
   }
 
   /* ---------- Sampel dan QC ---------- */
@@ -1929,9 +2017,10 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     return h;
   }
 
-  function setNote(t) { var el = document.getElementById('pdf-note'); if (el) el.textContent = t; }
+  function setNote(t) { var el = document.getElementById(curView === 'pl' ? 'pl-note' : 'pdf-note'); if (el) el.textContent = t; }
 
   function buildDoc() {
+    if (curView === 'pl') return makePlPdf(plData());
     ensureNumbers(); recordDocs();
     var m = state.pdfMode;
     if (m === 'pok') return makePoPdf(pokData());
@@ -2005,7 +2094,8 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
 
   function savePdf() { saveOnly = true; sharePdf(); }
   function sharePdf() {
-    ensureNumbers();
+    if (curView !== 'pl') ensureNumbers();
+    if (curView === 'pl' && !plData()) { setNote('Tambahkan minimal satu barang.'); return; }
     if (pendingFile && !saveOnly) { var pf = pendingFile; pendingFile = null; shareFile(pf.file, pf.blob, pf.name, pf.title, pf.msg); return; }
     var d = docData();
     var doc;
@@ -2021,8 +2111,8 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     var nImg = attFor(state.pdfMode).filter(function (a) { return a.kind === 'img'; }).length;
     function mk(b) { try { return new File([b], d.file, { type: 'application/pdf' }); } catch (e) { return null; } }
     var msg = 'PDF dibagikan' + (nImg + pdfs.length ? ' dengan ' + (nImg + pdfs.length) + ' lampiran.' : '.');
-    var FOLDER = { brand: '1. Quotation', po: '2. PO Subcon', pok: '2. PO Subcon', sj: '3. Surat Jalan (DO)', invoice: '4. Invoice', kw: '4. Invoice', internal: '5. Rincian Internal', ttb: '7. Tanda Terima Bahan' };
-    msg += ' Kalau disimpan ke Drive, pilih folder Pandera Garmenindo > ' + FOLDER[state.pdfMode] + '.';
+    var FOLDER = { pl: '8. Packing List', brand: '1. Quotation', po: '2. PO Subcon', pok: '2. PO Subcon', sj: '3. Surat Jalan (DO)', invoice: '4. Invoice', kw: '4. Invoice', internal: '5. Rincian Internal', ttb: '7. Tanda Terima Bahan' };
+    msg += ' Kalau disimpan ke Drive, pilih folder Pandera Garmenindo > ' + FOLDER[curView === 'pl' ? 'pl' : state.pdfMode] + '.';
     if (!pdfs.length) { shareFile(mk(blob), blob, d.file, d.title, msg); return; }
     if (!window.PDFLib) { setNote('Lampiran PDF belum bisa digabung. Pastikan HP terhubung internet, lalu muat ulang halaman.'); return; }
     setNote('Menggabungkan lampiran PDF...');
@@ -2033,6 +2123,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
   }
 
   function sheetHTML() {
+    if (curView === 'pl') { var plq = plData(); if (!plq) { setNote('Tambahkan minimal satu barang.'); return; } return plHTML(plq); }
     ensureNumbers(); recordDocs();
     var d = docData();
     var h, m = state.pdfMode;
@@ -2102,7 +2193,7 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
 
   /* ---------- Layar ---------- */
   function enter(sch) {
-    scheme = sch; state.scheme = sch;
+    scheme = sch; state.scheme = sch; curView = 'calc';
     var fob = sch === 'FOB';
     document.getElementById('v-home').hidden = true;
     document.getElementById('v-calc').hidden = false;
@@ -2116,7 +2207,8 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     window.scrollTo(0, 0);
   }
   function home() {
-    scheme = null;
+    scheme = null; curView = 'home';
+    var vp = document.getElementById('v-pl'); if (vp) vp.hidden = true;
     renderOrders(); renderPaySummary();
     document.getElementById('v-calc').hidden = true;
     document.getElementById('v-home').hidden = false;
@@ -2126,6 +2218,8 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
   function onInput(e) {
     var el = e.target;
     if (!el || !el.getAttribute) return;
+    if (el.id === 'f-plpick') { if (e.type === 'change') { state.plSel = el.value; save(); renderPl(); } return; }
+    var pf = el.getAttribute('data-pf'); if (pf) { var cpl = curPl(); if (cpl) { cpl[pf] = el.value; save(); } return; }
     if (el.id === 'f-lkadd') { if (e.type === 'change' && el.value) { state.links = (state.links || []).concat([el.value]); save(); renderLinks(); render(); } return; }
     if (el.id === 'f-restore') { if (e.type === 'change') { restore(el.files && el.files[0]); el.value = ''; } return; }
     if (el.id === 'f-attfile') { if (e.type === 'change') { addAttFiles(el.files); el.value = ''; } return; }
@@ -2228,9 +2322,9 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     if (ch) { newOrder(ch.getAttribute('data-scheme')); return; }
     var sdl = t.closest('[data-sdel]'); if (sdl) { state.samples.splice(+sdl.getAttribute('data-sdel'), 1); save(); renderSamples(); return; }
     var ia = t.closest('[data-itadd]');
-    if (ia) { var la = itemList(ia.getAttribute('data-itadd')); la.push({ d: '', k: '', q: 0, u: state.satuan === 'meter' ? 'meter' : 'kg', h: 0 }); save(); if (ia.getAttribute('data-itadd') === 'pok') renderPok(); else renderTtb(); return; }
+    if (ia) { var ip = ia.getAttribute('data-itadd'), la = itemList(ip); la.push({ d: '', k: '', q: ip === 'pl' ? 1 : 0, u: ip === 'pl' ? 'pcs' : (state.satuan === 'meter' ? 'meter' : 'kg'), h: 0 }); save(); if (ip === 'pok') renderPok(); else if (ip === 'pl') renderPl(); else renderTtb(); return; }
     var idl = t.closest('[data-itdel]');
-    if (idl) { var pr2 = idl.getAttribute('data-itdel').split('|'); itemList(pr2[0]).splice(+pr2[1], 1); save(); if (pr2[0] === 'pok') renderPok(); else renderTtb(); return; }
+    if (idl) { var pr2 = idl.getAttribute('data-itdel').split('|'); itemList(pr2[0]).splice(+pr2[1], 1); save(); if (pr2[0] === 'pok') renderPok(); else if (pr2[0] === 'pl') renderPl(); else renderTtb(); return; }
     var tdl = t.closest('[data-tdel]');
     if (tdl) { if (!confirm('Hapus catatan penerimaan bahan ini?')) return; var gone2 = state.ttb.splice(+tdl.getAttribute('data-tdel'), 1)[0]; if (gone2 && state.ttbSel === gone2.id) state.ttbSel = ''; save(); renderTtb(); return; }
     var pp = t.closest('[data-ppay]'), up = t.closest('[data-upay]');
@@ -2281,8 +2375,16 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
       save(); renderCustom(); render();
       return;
     }
-    var id = t.id;
+    var btn = t.closest('button'), id = btn ? btn.id : t.id;
     if (id === 'b-back') home();
+    else if (id === 'b-openpl') openPl();
+    else if (id === 'b-plback') { curView = 'home'; document.getElementById('v-pl').hidden = true; home(); }
+    else if (id === 'b-plnew') { newPl(); renderPl(); }
+    else if (id === 'b-pldel') { var cdl = curPl(); if (cdl && confirm('Hapus packing list ' + (cdl.no || 'ini') + '?')) { state.pls = state.pls.filter(function (x) { return x !== cdl; }); state.plSel = state.pls.length ? state.pls[state.pls.length - 1].id : ''; save(); renderPl(); } }
+    else if (id === 'b-pl-preview') openPreview();
+    else if (id === 'b-pl-share') sharePdf();
+    else if (id === 'b-pl-save') savePdf();
+    else if (id === 'b-pl-print') printSheet();
     else if (id === 'b-sadd') { state.samples.push({ tahap: '', tgl: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), status: 'menunggu', cat: '' }); save(); renderSamples(); }
     else if (id === 'b-pokfill') { if (state.pokItems.length && !confirm('Ganti daftar barang dengan perkiraan kebutuhan order?')) return; fillPok(); }
     else if (id === 'b-tadd') { var tn = { id: 't' + Date.now().toString(36), no: nextNo('TTB'), tgl: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), dari: state.brand || '', cat: '', items: [] }; state.ttb.push(tn); state.ttbSel = tn.id; save(); renderTtb(); }
@@ -2324,6 +2426,14 @@ h3.ph { font-size: 14px; margin: 14px 0 4px; }
     }
   });
 
+  if (!state.seq.PL) {
+    state.seq.PL = 27;
+    if (!state.pls.length) state.pls.push({ id: 'p027', no: 'PL-2026-027', tgl: '27 November 2026', to: 'Dienvibi', attn: 'Nanang',
+      addr: 'Jl. Damai II No. 2E, RT.3/RW.11, Kemang, Cipete Utara, Kec. Kebayoran Baru, Kota Jakarta Selatan, DKI Jakarta', koli: '',
+      items: ['Sample blazer', 'Sample celana formal', 'Katalog bahan celana', 'Sample bahan blazer', 'Polimicro tipis', 'Polimicro tebal', 'Sample bahan waffle Mahugitex', 'Katalog warna bahan waffle', 'Katalog warna bahan rib'].map(function (d) { return { d: d, k: '', q: 0, u: '', h: 0 }; }),
+      cat: 'Please check the items upon receipt. If anything is missing or damaged, kindly let us know within 2 days of receipt.' });
+    state.plSel = state.pls[state.pls.length - 1].id;
+  }
   loadOrders(); save(); loadAtt(); renderOrders(); renderPaySummary();
 })();
 </script>
