@@ -919,8 +919,8 @@ button.danger { color: var(--bad, #b3261e); }
       '<div class="actions"><button type="button" id="b-pobrand">+ Upload PO dari brand</button></div><div class="hint" id="inv-att"></div></div>' +
       '<div id="po-box">' + [['poVendor', 'Vendor tujuan PO', 'povendor'], ['poNomor', 'Nomor PO (kosongkan untuk otomatis)', 'text'],
         ['poInclude', 'Harga sudah termasuk', 'area'], ['poExclude', 'Harga belum termasuk', 'area'],
-        ['poKirim', 'Batas waktu pengiriman', 'text', 'Contoh: 20 Desember 2026'], ['poBayar', 'Syarat pembayaran ke vendor', 'area'],
-        ['poCatatan', 'Catatan untuk vendor', 'area']].map(fieldHTML).join('') +
+        ['poBayar', 'Syarat pembayaran', 'area'], ['poKirim', 'Pengiriman dan waktu produksi', 'area', 'Contoh: Selesai dan dikirim paling lambat 20 Desember 2026.'],
+        ['poCatatan', 'Ketentuan lain', 'area']].map(fieldHTML).join('') +
       '<div class="hint" id="po-info"></div></div>' +
       '<div class="actions"><button type="button" id="b-preview">Lihat preview</button><button type="button" class="primary" id="b-share">Bagikan PDF</button><button type="button" id="b-save">Simpan ke File</button><button type="button" id="b-print">Cetak</button></div>' +
       '<p class="note" id="pdf-note"></p>' +
@@ -1342,15 +1342,15 @@ button.danger { color: var(--bad, #b3261e); }
     var now = new Date();
     function pad(x) { return (x < 10 ? '0' : '') + x; }
     var tot = 0;
-    var rows = its.map(function (w) { var t = w.v * state.qty; tot += t; return [w.l, n(state.qty) + ' pcs', rp(w.v), rp(t)]; });
-    var notes = [['Spesifikasi', state.spek], ['Harga sudah termasuk', state.poInclude], ['Harga belum termasuk', state.poExclude], ['Batas waktu pengiriman', state.poKirim], ['Syarat pembayaran', state.poBayar], ['Catatan', state.poCatatan]]
+    var rows = its.map(function (w) { var t = w.v * state.qty; tot += t; return [w.l, state.spek || '-', n(state.qty) + ' pcs', rp(w.v), rp(t)]; });
+    var notes = [['Harga sudah termasuk', state.poInclude], ['Harga belum termasuk', state.poExclude], ['Syarat pembayaran', state.poBayar], ['Pengiriman dan waktu produksi', state.poKirim], ['Ketentuan lain', state.poCatatan]]
       .filter(function (x) { return x[1] && String(x[1]).trim(); });
     return {
       usaha: state.usaha, alamat: state.alamat, telp: state.telp,
       nomor: state.poNomor || ('PO-' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + '-' + (state.vendors.indexOf(v) + 1)),
       tanggal: now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
       vendor: vendorName(v, state.vendors.indexOf(v)), valamat: v.a, vtelp: v.t,
-      produk: state.nama || '-', rows: rows, total: rp(tot), notes: notes,
+      produk: state.nama || '-', perihal: 'Pesanan jasa jahit ' + (state.nama || 'produk'), rows: rows, total: rp(tot), notes: notes,
       ttd: state.ttd || state.usaha, ttdImg: state.ttdImg, sizes: state.grid.length ? sizeTable(function (r, s) { return (r.q || {})[s]; }) : null
     };
   }
@@ -1380,7 +1380,7 @@ button.danger { color: var(--bad, #b3261e); }
     var meta = [['No. PO', q.nomor], ['Tanggal', q.tanggal], ['Kepada', q.vendor]];
     if (q.valamat) meta.push(['Alamat', q.valamat]);
     if (q.vtelp) meta.push(['Telp/WA', q.vtelp]);
-    meta.push(['Produk', q.produk]);
+    meta.push(['Perihal', q.perihal]);
     doc.setFontSize(10);
     meta.forEach(function (m) {
       doc.setFont('helvetica', 'normal'); doc.setTextColor(110); doc.text(m[0], L, y);
@@ -1391,15 +1391,15 @@ button.danger { color: var(--bad, #b3261e); }
     y += 5;
     doc.setFillColor(B[0], B[1], B[2]); doc.rect(L, y - 5, W, 8, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(255);
-    doc.text('Pekerjaan', L + 2, y); doc.text('Jumlah', L + 100, y, { align: 'right' });
-    doc.text('Harga/pcs', L + 135, y, { align: 'right' }); doc.text('Total', L + 172, y, { align: 'right' });
+    doc.text('Pekerjaan', L + 2, y); doc.text('Spesifikasi', L + 52, y); doc.text('Jumlah', L + 112, y, { align: 'right' });
+    doc.text('Harga/pcs', L + 140, y, { align: 'right' }); doc.text('Total', L + 172, y, { align: 'right' });
     y += 8;
     doc.setFontSize(10); doc.setTextColor(0);
     q.rows.forEach(function (r) {
       doc.setFont('helvetica', 'normal');
-      var pl = doc.splitTextToSize(r[0], 70);
-      doc.text(pl, L + 2, y); doc.text(r[1], L + 100, y, { align: 'right' }); doc.text(r[2], L + 135, y, { align: 'right' }); doc.text(r[3], L + 172, y, { align: 'right' });
-      y += pl.length * 5 + 1.5; doc.setDrawColor(210); doc.setLineWidth(0.3); doc.line(L, y - 3.5, R, y - 3.5); y += 2.5;
+      var pl = doc.splitTextToSize(r[0], 46), sl = doc.splitTextToSize(r[1], 38);
+      doc.text(pl, L + 2, y); doc.text(sl, L + 52, y); doc.text(r[2], L + 112, y, { align: 'right' }); doc.text(r[3], L + 140, y, { align: 'right' }); doc.text(r[4], L + 172, y, { align: 'right' });
+      y += Math.max(pl.length, sl.length) * 5 + 1.5; doc.setDrawColor(210); doc.setLineWidth(0.3); doc.line(L, y - 3.5, R, y - 3.5); y += 2.5;
     });
     doc.setFont('helvetica', 'bold'); doc.text('Total', L + 135, y, { align: 'right' }); doc.text(q.total, L + 172, y, { align: 'right' });
     y += 11;
@@ -1435,10 +1435,10 @@ button.danger { color: var(--bad, #b3261e); }
     h += '<div class="m"><b>No. PO</b>' + esc(q.nomor) + '</div><div class="m"><b>Tanggal</b>' + esc(q.tanggal) + '</div><div class="m"><b>Kepada</b>' + esc(q.vendor) + '</div>';
     if (q.valamat) h += '<div class="m"><b>Alamat</b>' + br(q.valamat) + '</div>';
     if (q.vtelp) h += '<div class="m"><b>Telp/WA</b>' + esc(q.vtelp) + '</div>';
-    h += '<div class="m"><b>Produk</b>' + esc(q.produk) + '</div>';
-    h += '<table class="q"><thead><tr><th>Pekerjaan</th><th style="text-align:right">Jumlah</th><th style="text-align:right">Harga/pcs</th><th style="text-align:right">Total</th></tr></thead><tbody>';
-    q.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td style="text-align:right">' + esc(r[1]) + '</td><td style="text-align:right">' + esc(r[2]) + '</td><td style="text-align:right">' + esc(r[3]) + '</td></tr>'; });
-    h += '<tr><td></td><td></td><td style="text-align:right"><b>Total</b></td><td style="text-align:right"><b>' + esc(q.total) + '</b></td></tr></tbody></table>';
+    h += '<div class="m"><b>Perihal</b>' + esc(q.perihal) + '</div>';
+    h += '<table class="q"><thead><tr><th>Pekerjaan</th><th>Spesifikasi</th><th style="text-align:right">Jumlah</th><th style="text-align:right">Harga/pcs</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    q.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td style="text-align:right">' + esc(r[2]) + '</td><td style="text-align:right">' + esc(r[3]) + '</td><td style="text-align:right">' + esc(r[4]) + '</td></tr>'; });
+    h += '<tr><td></td><td></td><td></td><td style="text-align:right"><b>Total</b></td><td style="text-align:right"><b>' + esc(q.total) + '</b></td></tr></tbody></table>';
     if (q.sizes) h += '<div class="nt"><b>Rincian ukuran dan warna</b></div>' + tableHTML(q.sizes);
     q.notes.forEach(function (nt) { h += '<div class="nt"><b>' + esc(nt[0]) + '</b>' + br(nt[1]) + '</div>'; });
     h += '<div class="ttd"><div>Hormat kami,<div class="sp">' + (q.ttdImg ? '<img src="' + q.ttdImg + '" alt="" style="max-height:60px;max-width:180px">' : '') + '</div><b>' + esc(q.ttd || '') + '</b></div><div>Diterima oleh,<div class="sp"></div>' + esc(q.vendor) + '</div></div>';
